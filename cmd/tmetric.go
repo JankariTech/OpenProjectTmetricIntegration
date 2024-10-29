@@ -21,11 +21,12 @@ var startDate string
 var endDate string
 
 func validateOpenProjectWorkPackage(input string) error {
-	_, err := strconv.ParseInt(input, 10, 32)
-	if err != nil {
-		return errors.New("Invalid WP")
+	if len(input) > 0 {
+		_, err := strconv.ParseInt(input, 10, 32)
+		if err != nil {
+			return errors.New("Invalid WP")
+		}
 	}
-
 	return nil
 }
 
@@ -154,7 +155,10 @@ var tmetricCmd = &cobra.Command{
 
 		for _, entry := range entriesWithoutIssue {
 			prompt := promptui.Prompt{
-				Label:    fmt.Sprintf("%v => %v %v-%v. Provide a WP number to be assigned to this time-entry", entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime),
+				Label: fmt.Sprintf(
+					"%v => %v %v-%v. Provide a WP number to be assigned to this time-entry (Enter to skip)",
+					entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
+				),
 				Validate: validateOpenProjectWorkPackage,
 			}
 
@@ -166,6 +170,12 @@ var tmetricCmd = &cobra.Command{
 				if err != nil {
 					fmt.Printf("Prompt failed %v\n", err)
 					return
+				}
+
+				if workPackageId == "" {
+					fmt.Println("skipping")
+					workpackageFoundOnOpenProject = true
+					continue
 				}
 				workPackage, err := getWorkpackage(workPackageId)
 
