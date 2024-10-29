@@ -123,11 +123,7 @@ var tmetricCmd = &cobra.Command{
 				}
 				wpURL, _ := url.JoinPath(openProjectUrl, "/api/v3/work_packages/", workPackageId)
 				resp, err := openProjectHttpClient.R().
-					SetHeader("X-Authentication-Scheme", "Session").
-					SetHeader("X-Requested-With", "XMLHttpRequest").
-					SetHeader("Content-Type", "application/json").
-					SetHeader("Origin", openProjectUrl).
-					SetHeader("Cookie", "openproject_cloud_instances=community.openproject.org; _open_project_session="+openProjectToken).
+					SetBasicAuth("apikey", openProjectToken).
 					Get(wpURL)
 
 				if err == nil && resp.StatusCode() == 200 {
