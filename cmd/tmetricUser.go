@@ -25,7 +25,7 @@ func NewTmetricUser() *TmetricUser {
 
 	resp, err := httpClient.R().
 		SetAuthToken(config.tmetricToken).
-		Get(config.tmetricAPIBaseUrl + "user")
+		Get(config.tmetricAPIV3BaseUrl + "user")
 	if err != nil || resp.StatusCode() != 200 {
 		fmt.Fprintf(os.Stderr, "cannot reach tmetric server\n")
 		if err != nil {

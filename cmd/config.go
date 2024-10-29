@@ -7,9 +7,11 @@ import (
 )
 
 type Config struct {
-	tmetricToken      string
-	clientIdInTmetric int
-	tmetricAPIBaseUrl string
+	tmetricToken          string
+	clientIdInTmetric     int
+	tmetricAPIBaseUrl     string
+	tmetricAPIV3BaseUrl   string
+	tmetricDummyProjectId int
 }
 
 func NewConfig() *Config {
@@ -23,9 +25,16 @@ func NewConfig() *Config {
 		fmt.Fprintln(os.Stderr, "tmetric.clientId not set")
 		os.Exit(1)
 	}
+	tmetricDummyProjectId := viper.GetInt("tmetric.dummyProjectId")
+	if clientIdInTmetric == 0 {
+		fmt.Fprintln(os.Stderr, "tmetric.dummyProjectId not set")
+		os.Exit(1)
+	}
 	return &Config{
-		tmetricToken:      tmetricToken,
-		clientIdInTmetric: clientIdInTmetric,
-		tmetricAPIBaseUrl: "https://app.tmetric.com/api/v3/",
+		tmetricToken:          tmetricToken,
+		clientIdInTmetric:     clientIdInTmetric,
+		tmetricAPIBaseUrl:     "https://app.tmetric.com/api/",
+		tmetricAPIV3BaseUrl:   "https://app.tmetric.com/api/v3/",
+		tmetricDummyProjectId: tmetricDummyProjectId,
 	}
 }

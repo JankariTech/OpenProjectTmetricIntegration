@@ -37,7 +37,7 @@ func getAllTimeEntries(config *Config, tmetricUser *TmetricUser) ([]TimeEntry, e
 		Get(
 			fmt.Sprintf(
 				`%vaccounts/%v/timeentries?userId=%v&startDate=%v&endDate=%v`,
-				config.tmetricAPIBaseUrl,
+				config.tmetricAPIV3BaseUrl,
 				tmetricUser.Accounts[0].Id,
 				tmetricUser.Id,
 				startDate,
@@ -46,7 +46,7 @@ func getAllTimeEntries(config *Config, tmetricUser *TmetricUser) ([]TimeEntry, e
 		)
 	if err != nil || resp.StatusCode() != 200 {
 		return nil, fmt.Errorf(
-			"cannot read timeentries. Error: '%v'. HTTP status code:", err, resp.StatusCode(),
+			"cannot read timeentries. Error: '%v'. HTTP status code: %v", err, resp.StatusCode(),
 		)
 	}
 
@@ -59,7 +59,61 @@ func getAllTimeEntries(config *Config, tmetricUser *TmetricUser) ([]TimeEntry, e
 	return timeEntries, nil
 }
 
-// tmetricCmd represents the tmetric command
+/*
+*
+this is the only way to create an external task in tmetric.
+This task is needed to have an issueId of OpenProject assigned to a time entry.
+*/
+func createDummyTimeEntry(
+	workPackage WorkPackage, tmetricUser *TmetricUser, config *Config, openProjectUrl string,
+) (*TimeEntry, error) {
+	dummyTimeEntry := newDummyTimeEntry(workPackage, openProjectUrl, config.tmetricDummyProjectId)
+	dummyTimerString, _ := json.Marshal(dummyTimeEntry)
+	httpClient := resty.New()
+	resp, err := httpClient.R().
+		SetAuthToken(config.tmetricToken).
+		SetHeader("Content-Type", "application/json").
+		SetBody(dummyTimerString).
+		Post(fmt.Sprintf(
+			`%vaccounts/%v/timer/issue`,
+			config.tmetricAPIBaseUrl,
+			tmetricUser.Accounts[0].Id,
+		))
+	if err != nil || resp.StatusCode() != 200 {
+		return nil, fmt.Errorf(
+			"could not create dummy time entry. Error : '%v'. HTTP-Status-Code: %v",
+			err, resp.StatusCode(),
+		)
+	}
+
+	resp, err = httpClient.R().
+		SetAuthToken(config.tmetricToken).
+		SetQueryString("userId=" + strconv.Itoa(tmetricUser.Id)).
+		Get(
+			fmt.Sprintf(
+				`%vaccounts/%v/timeentries/latest`,
+				config.tmetricAPIV3BaseUrl,
+				tmetricUser.Accounts[0].Id,
+			),
+		)
+
+	if err != nil || resp.StatusCode() != 200 {
+		return nil, fmt.Errorf(
+			"could not find latest time entry. Error : '%v'. HTTP-Status-Code: %v",
+			err, resp.StatusCode(),
+		)
+	}
+	latestTimeEntry := TimeEntry{}
+	err = json.Unmarshal(resp.Body(), &latestTimeEntry)
+
+	if err != nil || latestTimeEntry.Note != "to-delete-only-created-to-create-an-external-task" {
+		return nil, fmt.Errorf(
+			"could not find dummy time entry",
+		)
+	}
+	return &latestTimeEntry, nil
+}
+
 var tmetricCmd = &cobra.Command{
 	Use:   "tmetric",
 	Short: "check the validity of the tmetric data",
@@ -78,7 +132,6 @@ var tmetricCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		config := NewConfig()
 
-		httpClient := resty.New()
 		tmetricUser := NewTmetricUser()
 		timeEntries, err := getAllTimeEntries(config, tmetricUser)
 		if err != nil {
@@ -141,40 +194,24 @@ var tmetricCmd = &cobra.Command{
 				}
 
 				prompt = promptui.Prompt{
-					Label:     fmt.Sprintf("WP: %q. Subject: %q. Updatey", workPackageId, workPackage.Subject),
+					Label:     fmt.Sprintf("WP: %q. Subject: %q. Updatey", workPackage.Id, workPackage.Subject),
 					IsConfirm: true,
 				}
 				updateTmetricConfirmation, err := prompt.Run()
 				if strings.ToLower(updateTmetricConfirmation) == "y" {
 					fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
-
-					resp, err = httpClient.R().
-						SetAuthToken(config.tmetricToken).
-						SetHeader("Content-Type", "application/json").
-						SetBody(fmt.Sprintf(
-							`{"task": {"externalLink": { "caption": "%v", "link": "%v", "issueId":"%v"}}}`,
-							workPackageId, wpURL, workPackageId,
-						)).
-						Put(
-							fmt.Sprintf(
-								`%vaccounts/%v/timeentries/%v`,
-								config.tmetricAPIBaseUrl,
-								tmetricUser.Accounts[0].Id,
-								entry.Id,
-							),
-						)
-
-					if err != nil || resp.StatusCode() != 200 {
-						fmt.Fprintf(os.Stderr, "could not update time entry\n")
-						if err != nil {
-							fmt.Fprintf(os.Stderr, "error: %v\n", err)
-						} else {
-							fmt.Fprintf(os.Stderr, "status code: %v\n", resp.StatusCode())
-						}
+					latestTimeEntry, err := createDummyTimeEntry(workPackage, tmetricUser, config, openProjectUrl)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 						return
 					}
-				}
+					_ = latestTimeEntry.delete(*config, *tmetricUser)
 
+					entry.Task = latestTimeEntry.Task
+
+					entry.update(*config, *tmetricUser)
+				}
+				fmt.Fprintf(os.Stderr, "resp %v\n", resp)
 			}
 		}
 	},
