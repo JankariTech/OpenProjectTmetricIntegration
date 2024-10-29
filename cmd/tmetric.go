@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -138,32 +139,42 @@ var tmetricCmd = &cobra.Command{
 					fmt.Fprintf(os.Stderr, "error parsing work packages response or no work packages found: %v\n", err)
 					return
 				}
-				fmt.Printf("You chose WP: %q. Subject: %v\n", workPackageId, workPackage.Subject)
-				resp, err = httpClient.R().
-					SetAuthToken(config.tmetricToken).
-					SetHeader("Content-Type", "application/json").
-					SetBody(fmt.Sprintf(
-						`{"task": {"externalLink": { "caption": "%v", "link": "%v", "issueId":"%v"}}}`,
-						workPackageId, wpURL, workPackageId,
-					)).
-					Put(
-						fmt.Sprintf(
-							`%vaccounts/%v/timeentries/%v`,
-							config.tmetricAPIBaseUrl,
-							tmetricUser.Accounts[0].Id,
-							entry.Id,
-						),
-					)
 
-				if err != nil || resp.StatusCode() != 200 {
-					fmt.Fprintf(os.Stderr, "could not update time entry\n")
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "error: %v\n", err)
-					} else {
-						fmt.Fprintf(os.Stderr, "status code: %v\n", resp.StatusCode())
-					}
-					return
+				prompt = promptui.Prompt{
+					Label:     fmt.Sprintf("WP: %q. Subject: %q. Updatey", workPackageId, workPackage.Subject),
+					IsConfirm: true,
 				}
+				updateTmetricConfirmation, err := prompt.Run()
+				if strings.ToLower(updateTmetricConfirmation) == "y" {
+					fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
+
+					resp, err = httpClient.R().
+						SetAuthToken(config.tmetricToken).
+						SetHeader("Content-Type", "application/json").
+						SetBody(fmt.Sprintf(
+							`{"task": {"externalLink": { "caption": "%v", "link": "%v", "issueId":"%v"}}}`,
+							workPackageId, wpURL, workPackageId,
+						)).
+						Put(
+							fmt.Sprintf(
+								`%vaccounts/%v/timeentries/%v`,
+								config.tmetricAPIBaseUrl,
+								tmetricUser.Accounts[0].Id,
+								entry.Id,
+							),
+						)
+
+					if err != nil || resp.StatusCode() != 200 {
+						fmt.Fprintf(os.Stderr, "could not update time entry\n")
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "error: %v\n", err)
+						} else {
+							fmt.Fprintf(os.Stderr, "status code: %v\n", resp.StatusCode())
+						}
+						return
+					}
+				}
+
 			}
 		}
 	},
