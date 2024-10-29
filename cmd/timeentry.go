@@ -75,7 +75,7 @@ func (timeEntry *TimeEntry) delete(config Config, user TmetricUser) error {
 			fmt.Sprintf(
 				`%vaccounts/%v/timeentries/%v`,
 				config.tmetricAPIV3BaseUrl,
-				user.Accounts[0].Id,
+				user.ActiveAccountId,
 				timeEntry.Id,
 			),
 		)
@@ -96,7 +96,7 @@ func (timeEntry *TimeEntry) update(config Config, user TmetricUser) error {
 			fmt.Sprintf(
 				`%vaccounts/%v/timeentries/%v`,
 				config.tmetricAPIV3BaseUrl,
-				user.Accounts[0].Id,
+				user.ActiveAccountId,
 				timeEntry.Id,
 			),
 		)

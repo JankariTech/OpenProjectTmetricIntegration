@@ -37,7 +37,7 @@ func getAllTimeEntries(config *Config, tmetricUser *TmetricUser) ([]TimeEntry, e
 			fmt.Sprintf(
 				`%vaccounts/%v/timeentries?userId=%v&startDate=%v&endDate=%v`,
 				config.tmetricAPIV3BaseUrl,
-				tmetricUser.Accounts[0].Id,
+				tmetricUser.ActiveAccountId,
 				tmetricUser.Id,
 				startDate,
 				endDate,
@@ -76,7 +76,7 @@ func createDummyTimeEntry(
 		Post(fmt.Sprintf(
 			`%vaccounts/%v/timer/issue`,
 			config.tmetricAPIBaseUrl,
-			tmetricUser.Accounts[0].Id,
+			tmetricUser.ActiveAccountId,
 		))
 	if err != nil || resp.StatusCode() != 200 {
 		return nil, fmt.Errorf(
@@ -92,7 +92,7 @@ func createDummyTimeEntry(
 			fmt.Sprintf(
 				`%vaccounts/%v/timeentries/latest`,
 				config.tmetricAPIV3BaseUrl,
-				tmetricUser.Accounts[0].Id,
+				tmetricUser.ActiveAccountId,
 			),
 		)
 

@@ -7,15 +7,10 @@ import (
 	"os"
 )
 
-type TmetricAccount struct {
-	Id   int    `json:"id"`
-	Name string `json:"name"`
-}
-
 type TmetricUser struct {
-	Id       int              `json:"id"`
-	Name     string           `json:"name"`
-	Accounts []TmetricAccount `json:"accounts"`
+	Id              int    `json:"id"`
+	Name            string `json:"name"`
+	ActiveAccountId int    `json:"activeAccountId"`
 }
 
 func NewTmetricUser() *TmetricUser {
@@ -42,9 +37,5 @@ func NewTmetricUser() *TmetricUser {
 		os.Exit(1)
 	}
 
-	if len(user.Accounts) == 0 {
-		fmt.Fprintf(os.Stderr, "could not find accountID in response: %v\n", resp)
-		os.Exit(1)
-	}
 	return &user
 }
