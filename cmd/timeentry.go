@@ -29,6 +29,12 @@ type Project struct {
 	Client Client `json:"client"`
 }
 
+type Tag struct {
+	Id         int    `json:"id"`
+	Name       string `json:"name"`
+	IsWorkType bool   `json:"isWorkType"`
+}
+
 type TimeEntry struct {
 	Id        int     `json:"id"`
 	StartTime string  `json:"startTime"`
@@ -36,6 +42,7 @@ type TimeEntry struct {
 	Task      Task    `json:"task"`
 	Project   Project `json:"project"`
 	Note      string  `json:"note"`
+	Tags      []Tag   `json:"tags"`
 }
 
 type DummyTimeEntry struct {
