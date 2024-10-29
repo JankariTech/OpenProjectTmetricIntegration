@@ -162,7 +162,7 @@ var tmetricCmd = &cobra.Command{
 
 		for _, entry := range entriesWithoutIssue {
 			prompt := promptui.Prompt{
-				Label:    fmt.Sprintf("%v %v %v", entry.Note, entry.StartTime, entry.EndTime),
+				Label:    fmt.Sprintf("%v %v %v. Provide a WP number to be assigned to this time-entry", entry.Note, entry.StartTime, entry.EndTime),
 				Validate: validateOpenProjectWorkPackage,
 			}
 
@@ -195,7 +195,9 @@ var tmetricCmd = &cobra.Command{
 				}
 
 				prompt = promptui.Prompt{
-					Label:     fmt.Sprintf("WP: %v. Subject: %v. Update", workPackage.Id, workPackage.Subject),
+					Label: fmt.Sprintf(
+						"WP: %v. Subject: %v. Update t-metric entry?", workPackage.Id, workPackage.Subject,
+					),
 					IsConfirm: true,
 				}
 				updateTmetricConfirmation, err := prompt.Run()
@@ -207,9 +209,7 @@ var tmetricCmd = &cobra.Command{
 						return
 					}
 					_ = latestTimeEntry.delete(*config, *tmetricUser)
-
 					entry.Task = latestTimeEntry.Task
-
 					entry.update(*config, *tmetricUser)
 				}
 			}
