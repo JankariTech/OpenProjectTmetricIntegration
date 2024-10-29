@@ -211,7 +211,6 @@ var tmetricCmd = &cobra.Command{
 
 					entry.update(*config, *tmetricUser)
 				}
-				fmt.Fprintf(os.Stderr, "resp %v\n", resp)
 			}
 		}
 	},
