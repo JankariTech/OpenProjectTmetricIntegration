@@ -154,7 +154,7 @@ var tmetricCmd = &cobra.Command{
 
 		for _, entry := range entriesWithoutIssue {
 			prompt := promptui.Prompt{
-				Label:    fmt.Sprintf("%v %v %v. Provide a WP number to be assigned to this time-entry", entry.Note, entry.StartTime, entry.EndTime),
+				Label:    fmt.Sprintf("%v => %v %v-%v. Provide a WP number to be assigned to this time-entry", entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime),
 				Validate: validateOpenProjectWorkPackage,
 			}
 
