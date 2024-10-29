@@ -11,7 +11,6 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -138,16 +137,11 @@ var tmetricCmd = &cobra.Command{
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-		var filteredEntries []TimeEntry
-		for _, entry := range timeEntries {
-			if entry.Project.Client.Id == config.clientIdInTmetric {
-				filteredEntries = append(filteredEntries, entry)
-			}
-		}
 
+		// get all entries that belong to the client and do not have an external link
 		var entriesWithoutIssue []TimeEntry
-		for _, entry := range filteredEntries {
-			if entry.Task.ExternalLink.IssueId == "" {
+		for _, entry := range timeEntries {
+			if entry.Project.Client.Id == config.clientIdInTmetric && entry.Task.ExternalLink.IssueId == "" {
 				entriesWithoutIssue = append(entriesWithoutIssue, entry)
 			}
 		}
@@ -156,9 +150,7 @@ var tmetricCmd = &cobra.Command{
 			fmt.Println("Some time-entries do not have any workpackages assigned")
 		}
 
-		openProjectToken := viper.Get("openproject.token").(string)
 		openProjectUrl := viper.Get("openproject.url").(string)
-		openProjectHttpClient := resty.New()
 
 		for _, entry := range entriesWithoutIssue {
 			prompt := promptui.Prompt{
@@ -175,22 +167,12 @@ var tmetricCmd = &cobra.Command{
 					fmt.Printf("Prompt failed %v\n", err)
 					return
 				}
-				wpURL, _ := url.JoinPath(openProjectUrl, "/api/v3/work_packages/", workPackageId)
-				resp, err := openProjectHttpClient.R().
-					SetBasicAuth("apikey", openProjectToken).
-					Get(wpURL)
+				workPackage, err := getWorkpackage(workPackageId)
 
-				if err == nil && resp.StatusCode() == 200 {
+				if err == nil {
 					workpackageFoundOnOpenProject = true
 				} else {
-					fmt.Printf("Could not find WP in %v\n", openProjectUrl)
-					continue
-				}
-
-				var workPackage WorkPackage
-				err = json.Unmarshal(resp.Body(), &workPackage)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "error parsing work packages response or no work packages found: %v\n", err)
+					fmt.Printf("%v\n", err)
 					continue
 				}
 
