@@ -184,13 +184,14 @@ var tmetricCmd = &cobra.Command{
 					workpackageFoundOnOpenProject = true
 				} else {
 					fmt.Printf("Could not find WP in %v\n", openProjectUrl)
+					continue
 				}
 
 				var workPackage WorkPackage
 				err = json.Unmarshal(resp.Body(), &workPackage)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error parsing work packages response or no work packages found: %v\n", err)
-					return
+					continue
 				}
 
 				prompt = promptui.Prompt{
