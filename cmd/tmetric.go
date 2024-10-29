@@ -194,7 +194,7 @@ var tmetricCmd = &cobra.Command{
 				}
 
 				prompt = promptui.Prompt{
-					Label:     fmt.Sprintf("WP: %q. Subject: %q. Updatey", workPackage.Id, workPackage.Subject),
+					Label:     fmt.Sprintf("WP: %v. Subject: %v. Update", workPackage.Id, workPackage.Subject),
 					IsConfirm: true,
 				}
 				updateTmetricConfirmation, err := prompt.Run()
