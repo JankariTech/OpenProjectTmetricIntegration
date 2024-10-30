@@ -10,7 +10,6 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"os"
 	"strconv"
 	"strings"
@@ -65,9 +64,9 @@ this is the only way to create an external task in tmetric.
 This task is needed to have an issueId of OpenProject assigned to a time entry.
 */
 func createDummyTimeEntry(
-	workPackage WorkPackage, tmetricUser *TmetricUser, config *Config, openProjectUrl string,
+	workPackage WorkPackage, tmetricUser *TmetricUser, config *Config,
 ) (*TimeEntry, error) {
-	dummyTimeEntry := newDummyTimeEntry(workPackage, openProjectUrl, config.tmetricDummyProjectId)
+	dummyTimeEntry := newDummyTimeEntry(workPackage, config.openProjectUrl, config.tmetricDummyProjectId)
 	dummyTimerString, _ := json.Marshal(dummyTimeEntry)
 	httpClient := resty.New()
 	resp, err := httpClient.R().
@@ -127,8 +126,6 @@ func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser
 		fmt.Println("Some time-entries do not have any workpackages assigned")
 	}
 
-	openProjectUrl := viper.Get("openproject.url").(string)
-
 	for _, entry := range entriesWithoutIssue {
 		prompt := promptui.Prompt{
 			Label: fmt.Sprintf(
@@ -153,7 +150,7 @@ func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser
 				workpackageFoundOnOpenProject = true
 				continue
 			}
-			workPackage, err := getWorkpackage(workPackageId)
+			workPackage, err := getWorkpackage(workPackageId, config)
 
 			if err == nil {
 				workpackageFoundOnOpenProject = true
@@ -171,7 +168,7 @@ func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser
 			updateTmetricConfirmation, err := prompt.Run()
 			if strings.ToLower(updateTmetricConfirmation) == "y" {
 				fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
-				latestTimeEntry, err := createDummyTimeEntry(workPackage, tmetricUser, config, openProjectUrl)
+				latestTimeEntry, err := createDummyTimeEntry(workPackage, tmetricUser, config)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 					return

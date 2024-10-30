@@ -7,6 +7,8 @@ import (
 )
 
 type Config struct {
+	openProjectUrl        string
+	openProjectToken      string
 	tmetricToken          string
 	clientIdInTmetric     int
 	tmetricAPIBaseUrl     string
@@ -15,6 +17,16 @@ type Config struct {
 }
 
 func NewConfig() *Config {
+	openProjectUrl := viper.GetString("openproject.url")
+	if openProjectUrl == "" {
+		fmt.Fprintln(os.Stderr, "openproject.url not set")
+		os.Exit(1)
+	}
+	openProjectToken := viper.GetString("openproject.token")
+	if openProjectToken == "" {
+		fmt.Fprintln(os.Stderr, "openproject.token not set")
+		os.Exit(1)
+	}
 	tmetricToken := viper.GetString("tmetric.token")
 	if tmetricToken == "" {
 		fmt.Fprintln(os.Stderr, "tmetric.token not set")
@@ -31,6 +43,8 @@ func NewConfig() *Config {
 		os.Exit(1)
 	}
 	return &Config{
+		openProjectUrl:        openProjectUrl,
+		openProjectToken:      openProjectToken,
 		tmetricToken:          tmetricToken,
 		clientIdInTmetric:     clientIdInTmetric,
 		tmetricAPIBaseUrl:     "https://app.tmetric.com/api/",

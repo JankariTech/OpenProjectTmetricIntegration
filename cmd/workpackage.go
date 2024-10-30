@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
-	"github.com/spf13/viper"
 	"net/url"
 )
 
@@ -13,18 +12,16 @@ type WorkPackage struct {
 	Id      int    `json:"id"`
 }
 
-func getWorkpackage(workPackageId string) (WorkPackage, error) {
-	openProjectToken := viper.Get("openproject.token").(string)
-	openProjectUrl := viper.Get("openproject.url").(string)
+func getWorkpackage(workPackageId string, config *Config) (WorkPackage, error) {
 	openProjectHttpClient := resty.New()
 
-	wpURL, _ := url.JoinPath(openProjectUrl, "/api/v3/work_packages/", workPackageId)
+	wpURL, _ := url.JoinPath(config.openProjectUrl, "/api/v3/work_packages/", workPackageId)
 	resp, err := openProjectHttpClient.R().
-		SetBasicAuth("apikey", openProjectToken).
+		SetBasicAuth("apikey", config.openProjectToken).
 		Get(wpURL)
 
 	if err != nil || resp.StatusCode() != 200 {
-		return WorkPackage{}, fmt.Errorf("could not find WP in %v", openProjectUrl)
+		return WorkPackage{}, fmt.Errorf("could not find WP in %v", config.openProjectUrl)
 	}
 
 	var workPackage WorkPackage
