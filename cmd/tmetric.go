@@ -184,6 +184,84 @@ func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser
 	return nil
 }
 
+func getEntriesWithoutWorkType(timeEntries []TimeEntry, config *Config) []TimeEntry {
+	// get all entries that belong to the client and do not have any work-type set
+	var entriesWithoutWorkType []TimeEntry
+	for _, entry := range timeEntries {
+		if entry.Project.Client.Id == config.clientIdInTmetric {
+			workTypeFound := false
+			for _, tag := range entry.Tags {
+				if tag.IsWorkType {
+					workTypeFound = true
+					break
+				}
+			}
+			if !workTypeFound {
+				entriesWithoutWorkType = append(entriesWithoutWorkType, entry)
+			}
+		}
+	}
+	return entriesWithoutWorkType
+}
+
+func handleEntriesWithoutWorkType(timeEntries []TimeEntry, tmetricUser *TmetricUser, config *Config) error {
+	entriesWithoutWorkType := getEntriesWithoutWorkType(timeEntries, config)
+	if len(entriesWithoutWorkType) > 0 {
+		fmt.Println("Some time-entries do not have any work type assigned")
+	}
+
+	for _, entry := range entriesWithoutWorkType {
+		possibleWorkTypes, err := entry.getPossibleWorkTypes(*config, *tmetricUser)
+
+		if err != nil {
+			return err
+		}
+
+		if len(possibleWorkTypes) == 0 {
+			return fmt.Errorf("could not find any work types for project %v", entry.Project.Name)
+		}
+
+		var promptItems []string
+		for _, workType := range possibleWorkTypes {
+			promptItems = append(promptItems, workType.Name)
+		}
+		promptItems = append(promptItems, "skip")
+		promptSelectWorkType := promptui.Select{
+			Label: fmt.Sprintf(
+				"%v => %v %v-%v. Select work-type",
+				entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
+			),
+			Items: promptItems,
+		}
+		_, workType, err := promptSelectWorkType.Run()
+		if err != nil {
+			return fmt.Errorf("prompt failed: %v", err)
+		}
+		if workType == "skip" {
+			fmt.Println("skipping")
+			continue
+		}
+
+		promptConfirm := promptui.Prompt{
+			Label: fmt.Sprintf(
+				"Work-type: %v. Update t-metric entry", workType,
+			),
+			IsConfirm: true,
+		}
+		updateTmetricConfirmation, err := promptConfirm.Run()
+		if strings.ToLower(updateTmetricConfirmation) == "y" {
+			entry.Tags = append(entry.Tags, Tag{Name: workType, IsWorkType: true})
+			fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
+
+			err = entry.update(*config, *tmetricUser)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 var tmetricCmd = &cobra.Command{
 	Use:   "tmetric",
 	Short: "check the validity of the tmetric data",
@@ -213,7 +291,11 @@ var tmetricCmd = &cobra.Command{
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-
+		err = handleEntriesWithoutWorkType(timeEntries, tmetricUser, config)
+		if err != nil {
+			_, _ = fmt.Fprint(os.Stderr, err)
+			os.Exit(1)
+		}
 	},
 }
 
