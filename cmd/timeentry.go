@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
+	"strconv"
 )
 
 type ExternalLink struct {
@@ -114,4 +115,37 @@ func (timeEntry *TimeEntry) update(config Config, user TmetricUser) error {
 		)
 	}
 	return nil
+}
+
+func (timeEntry *TimeEntry) getPossibleWorkTypes(config Config, user TmetricUser) ([]Tag, error) {
+	httpClient := resty.New()
+
+	resp, err := httpClient.R().
+		SetAuthToken(config.tmetricToken).
+		SetHeader("Content-Type", "application/json").
+		SetQueryParam("projectId", strconv.Itoa(timeEntry.Project.Id)).
+		Get(fmt.Sprintf(
+			`%vaccounts/%v/timeentries/tags`,
+			config.tmetricAPIV3BaseUrl,
+			user.ActiveAccountId,
+		))
+	if err != nil || resp.StatusCode() != 200 {
+		return nil, fmt.Errorf(
+			"could not get tags from t-metric\n"+
+				"Error : '%v'. HTTP-Status-Code: %v",
+			err, resp.StatusCode(),
+		)
+	}
+	var tags []Tag
+	err = json.Unmarshal(resp.Body(), &tags)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+	var workTypes []Tag
+	for _, tag := range tags {
+		if tag.IsWorkType {
+			workTypes = append(workTypes, tag)
+		}
+	}
+	return workTypes, nil
 }
