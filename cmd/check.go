@@ -13,9 +13,9 @@ import (
 var checkCmd = &cobra.Command{
 	Use:   "check",
 	Short: "validate the data",
-	Long:  `call wit 'tmetric' or 'openproject'`,
+	Long:  `call with 'tmetric' or 'openproject'`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("please supply a subcommand")
+		fmt.Println("please supply a subcommand (tmetric or openproject)")
 	},
 }
 
