@@ -80,7 +80,8 @@ func createDummyTimeEntry(
 		))
 	if err != nil || resp.StatusCode() != 200 {
 		return nil, fmt.Errorf(
-			"could not create dummy time entry. Error : '%v'. HTTP-Status-Code: %v",
+			"could not create dummy time entry. Is 'tmetric.dummyProjectId' set correctly in the config?\n"+
+				"Error : '%v'. HTTP-Status-Code: %v",
 			err, resp.StatusCode(),
 		)
 	}
@@ -113,7 +114,7 @@ func createDummyTimeEntry(
 	return &latestTimeEntry, nil
 }
 
-func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser, config *Config) {
+func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser, config *Config) error {
 	// get all entries that belong to the client and do not have an external link
 	var entriesWithoutIssue []TimeEntry
 	for _, entry := range timeEntries {
@@ -141,8 +142,7 @@ func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser
 			workPackageId, err := prompt.Run()
 
 			if err != nil {
-				fmt.Printf("Prompt failed %v\n", err)
-				return
+				return fmt.Errorf("prompt failed: %v", err)
 			}
 
 			if workPackageId == "" {
@@ -170,15 +170,18 @@ func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser
 				fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
 				latestTimeEntry, err := createDummyTimeEntry(workPackage, tmetricUser, config)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-					return
+					return err
 				}
 				_ = latestTimeEntry.delete(*config, *tmetricUser)
 				entry.Task = latestTimeEntry.Task
-				entry.update(*config, *tmetricUser)
+				err = entry.update(*config, *tmetricUser)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
+	return nil
 }
 
 var tmetricCmd = &cobra.Command{
@@ -201,9 +204,13 @@ var tmetricCmd = &cobra.Command{
 
 		tmetricUser := NewTmetricUser()
 		timeEntries, err := getAllTimeEntries(config, tmetricUser)
-		handleEntriesWithoutIssue(timeEntries, tmetricUser, config)
 		if err != nil {
-			fmt.Fprint(os.Stderr, err)
+			_, _ = fmt.Fprint(os.Stderr, err)
+			os.Exit(1)
+		}
+		err = handleEntriesWithoutIssue(timeEntries, tmetricUser, config)
+		if err != nil {
+			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
 
