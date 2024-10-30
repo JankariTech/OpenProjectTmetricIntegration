@@ -114,6 +114,76 @@ func createDummyTimeEntry(
 	return &latestTimeEntry, nil
 }
 
+func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser, config *Config) {
+	// get all entries that belong to the client and do not have an external link
+	var entriesWithoutIssue []TimeEntry
+	for _, entry := range timeEntries {
+		if entry.Project.Client.Id == config.clientIdInTmetric && entry.Task.ExternalLink.IssueId == "" {
+			entriesWithoutIssue = append(entriesWithoutIssue, entry)
+		}
+	}
+
+	if len(entriesWithoutIssue) > 0 {
+		fmt.Println("Some time-entries do not have any workpackages assigned")
+	}
+
+	openProjectUrl := viper.Get("openproject.url").(string)
+
+	for _, entry := range entriesWithoutIssue {
+		prompt := promptui.Prompt{
+			Label: fmt.Sprintf(
+				"%v => %v %v-%v. Provide a WP number to be assigned to this time-entry (Enter to skip)",
+				entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
+			),
+			Validate: validateOpenProjectWorkPackage,
+		}
+
+		workpackageFoundOnOpenProject := false
+		for !workpackageFoundOnOpenProject {
+
+			workPackageId, err := prompt.Run()
+
+			if err != nil {
+				fmt.Printf("Prompt failed %v\n", err)
+				return
+			}
+
+			if workPackageId == "" {
+				fmt.Println("skipping")
+				workpackageFoundOnOpenProject = true
+				continue
+			}
+			workPackage, err := getWorkpackage(workPackageId)
+
+			if err == nil {
+				workpackageFoundOnOpenProject = true
+			} else {
+				fmt.Printf("%v\n", err)
+				continue
+			}
+
+			prompt = promptui.Prompt{
+				Label: fmt.Sprintf(
+					"WP: %v. Subject: %v. Update t-metric entry?", workPackage.Id, workPackage.Subject,
+				),
+				IsConfirm: true,
+			}
+			updateTmetricConfirmation, err := prompt.Run()
+			if strings.ToLower(updateTmetricConfirmation) == "y" {
+				fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
+				latestTimeEntry, err := createDummyTimeEntry(workPackage, tmetricUser, config, openProjectUrl)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+					return
+				}
+				_ = latestTimeEntry.delete(*config, *tmetricUser)
+				entry.Task = latestTimeEntry.Task
+				entry.update(*config, *tmetricUser)
+			}
+		}
+	}
+}
+
 var tmetricCmd = &cobra.Command{
 	Use:   "tmetric",
 	Short: "check the validity of the tmetric data",
@@ -134,78 +204,12 @@ var tmetricCmd = &cobra.Command{
 
 		tmetricUser := NewTmetricUser()
 		timeEntries, err := getAllTimeEntries(config, tmetricUser)
+		handleEntriesWithoutIssue(timeEntries, tmetricUser, config)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
 
-		// get all entries that belong to the client and do not have an external link
-		var entriesWithoutIssue []TimeEntry
-		for _, entry := range timeEntries {
-			if entry.Project.Client.Id == config.clientIdInTmetric && entry.Task.ExternalLink.IssueId == "" {
-				entriesWithoutIssue = append(entriesWithoutIssue, entry)
-			}
-		}
-
-		if len(entriesWithoutIssue) > 0 {
-			fmt.Println("Some time-entries do not have any workpackages assigned")
-		}
-
-		openProjectUrl := viper.Get("openproject.url").(string)
-
-		for _, entry := range entriesWithoutIssue {
-			prompt := promptui.Prompt{
-				Label: fmt.Sprintf(
-					"%v => %v %v-%v. Provide a WP number to be assigned to this time-entry (Enter to skip)",
-					entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
-				),
-				Validate: validateOpenProjectWorkPackage,
-			}
-
-			workpackageFoundOnOpenProject := false
-			for !workpackageFoundOnOpenProject {
-
-				workPackageId, err := prompt.Run()
-
-				if err != nil {
-					fmt.Printf("Prompt failed %v\n", err)
-					return
-				}
-
-				if workPackageId == "" {
-					fmt.Println("skipping")
-					workpackageFoundOnOpenProject = true
-					continue
-				}
-				workPackage, err := getWorkpackage(workPackageId)
-
-				if err == nil {
-					workpackageFoundOnOpenProject = true
-				} else {
-					fmt.Printf("%v\n", err)
-					continue
-				}
-
-				prompt = promptui.Prompt{
-					Label: fmt.Sprintf(
-						"WP: %v. Subject: %v. Update t-metric entry?", workPackage.Id, workPackage.Subject,
-					),
-					IsConfirm: true,
-				}
-				updateTmetricConfirmation, err := prompt.Run()
-				if strings.ToLower(updateTmetricConfirmation) == "y" {
-					fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
-					latestTimeEntry, err := createDummyTimeEntry(workPackage, tmetricUser, config, openProjectUrl)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-						return
-					}
-					_ = latestTimeEntry.delete(*config, *tmetricUser)
-					entry.Task = latestTimeEntry.Task
-					entry.update(*config, *tmetricUser)
-				}
-			}
-		}
 	},
 }
 
