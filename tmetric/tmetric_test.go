@@ -1,17 +1,18 @@
-package cmd
+package tmetric
 
 import (
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 )
 
-func Test_getEntriesWithoutWorkType(t *testing.T) {
+func Test_GetEntriesWithoutWorkType(t *testing.T) {
 	type args struct {
 		timeEntries []TimeEntry
-		tmetricUser *TmetricUser
-		config      *Config
+		tmetricUser *User
+		config      *config.Config
 	}
 	tests := []struct {
 		name           string
@@ -33,8 +34,8 @@ func Test_getEntriesWithoutWorkType(t *testing.T) {
 						Tags:      []Tag{},
 					},
 				},
-				config: &Config{
-					clientIdInTmetric: 123,
+				config: &config.Config{
+					ClientIdInTmetric: 123,
 				},
 			},
 			expectedResult: []TimeEntry{
@@ -85,8 +86,8 @@ func Test_getEntriesWithoutWorkType(t *testing.T) {
 						},
 					},
 				},
-				config: &Config{
-					clientIdInTmetric: 123,
+				config: &config.Config{
+					ClientIdInTmetric: 123,
 				},
 			},
 			expectedResult: nil,
@@ -134,8 +135,8 @@ func Test_getEntriesWithoutWorkType(t *testing.T) {
 						},
 					},
 				},
-				config: &Config{
-					clientIdInTmetric: 123,
+				config: &config.Config{
+					ClientIdInTmetric: 123,
 				},
 			},
 			expectedResult: []TimeEntry{
@@ -182,13 +183,12 @@ func Test_getEntriesWithoutWorkType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getEntriesWithoutWorkType(tt.args.timeEntries, tt.args.config)
+			result := GetEntriesWithoutWorkType(tt.args.timeEntries, tt.args.config)
 			if !reflect.DeepEqual(result, tt.expectedResult) {
 				t.Errorf("got %v, want %v", result, tt.expectedResult)
 			}
 		})
 	}
-
 }
 
 func Test_getPossibleWorkTypes(t *testing.T) {
@@ -242,17 +242,17 @@ func Test_getPossibleWorkTypes(t *testing.T) {
 				w.Write([]byte(tt.mockResponse))
 			}))
 			defer mockServer.Close()
-			config := Config{
-				tmetricToken:        "dummyToken",
-				tmetricAPIV3BaseUrl: mockServer.URL + "/",
+			config := config.Config{
+				TmetricToken:        "dummyToken",
+				TmetricAPIV3BaseUrl: mockServer.URL + "/",
 			}
-			user := TmetricUser{
+			user := User{
 				ActiveAccountId: 1,
 			}
 			timeEntry := TimeEntry{
 				Project: Project{Id: 1},
 			}
-			result, err := timeEntry.getPossibleWorkTypes(config, user)
+			result, err := timeEntry.GetPossibleWorkTypes(config, user)
 			if (err != nil) != tt.expectError {
 				t.Errorf("expected error: %v, got: %v", tt.expectError, err)
 			}

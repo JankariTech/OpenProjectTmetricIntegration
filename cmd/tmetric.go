@@ -18,10 +18,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-resty/resty/v2"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"os"
@@ -43,96 +44,11 @@ func validateOpenProjectWorkPackage(input string) error {
 	return nil
 }
 
-func getAllTimeEntries(config *Config, tmetricUser *TmetricUser) ([]TimeEntry, error) {
-	httpClient := resty.New()
-	resp, err := httpClient.R().
-		SetAuthToken(config.tmetricToken).
-		Get(
-			fmt.Sprintf(
-				`%vaccounts/%v/timeentries?userId=%v&startDate=%v&endDate=%v`,
-				config.tmetricAPIV3BaseUrl,
-				tmetricUser.ActiveAccountId,
-				tmetricUser.Id,
-				startDate,
-				endDate,
-			),
-		)
-	if err != nil || resp.StatusCode() != 200 {
-		return nil, fmt.Errorf(
-			"cannot read timeentries. Error: '%v'. HTTP status code: %v", err, resp.StatusCode(),
-		)
-	}
-
-	var timeEntries []TimeEntry
-	err = json.Unmarshal(resp.Body(), &timeEntries)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing time entries response: %v\n", err)
-	}
-
-	return timeEntries, nil
-}
-
-/*
-*
-this is the only way to create an external task in tmetric.
-This task is needed to have an issueId of OpenProject assigned to a time entry.
-*/
-func createDummyTimeEntry(
-	workPackage WorkPackage, tmetricUser *TmetricUser, config *Config,
-) (*TimeEntry, error) {
-	dummyTimeEntry := newDummyTimeEntry(workPackage, config.openProjectUrl, config.tmetricDummyProjectId)
-	dummyTimerString, _ := json.Marshal(dummyTimeEntry)
-	httpClient := resty.New()
-	resp, err := httpClient.R().
-		SetAuthToken(config.tmetricToken).
-		SetHeader("Content-Type", "application/json").
-		SetBody(dummyTimerString).
-		Post(fmt.Sprintf(
-			`%vaccounts/%v/timer/issue`,
-			config.tmetricAPIBaseUrl,
-			tmetricUser.ActiveAccountId,
-		))
-	if err != nil || resp.StatusCode() != 200 {
-		return nil, fmt.Errorf(
-			"could not create dummy time entry. Is 'tmetric.dummyProjectId' set correctly in the config?\n"+
-				"Error : '%v'. HTTP-Status-Code: %v",
-			err, resp.StatusCode(),
-		)
-	}
-
-	resp, err = httpClient.R().
-		SetAuthToken(config.tmetricToken).
-		SetQueryString("userId=" + strconv.Itoa(tmetricUser.Id)).
-		Get(
-			fmt.Sprintf(
-				`%vaccounts/%v/timeentries/latest`,
-				config.tmetricAPIV3BaseUrl,
-				tmetricUser.ActiveAccountId,
-			),
-		)
-
-	if err != nil || resp.StatusCode() != 200 {
-		return nil, fmt.Errorf(
-			"could not find latest time entry. Error : '%v'. HTTP-Status-Code: %v",
-			err, resp.StatusCode(),
-		)
-	}
-	latestTimeEntry := TimeEntry{}
-	err = json.Unmarshal(resp.Body(), &latestTimeEntry)
-
-	if err != nil || latestTimeEntry.Note != "to-delete-only-created-to-create-an-external-task" {
-		return nil, fmt.Errorf(
-			"could not find dummy time entry",
-		)
-	}
-	return &latestTimeEntry, nil
-}
-
-func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser, config *Config) error {
+func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser *tmetric.User, config *config.Config) error {
 	// get all entries that belong to the client and do not have an external link
-	var entriesWithoutIssue []TimeEntry
+	var entriesWithoutIssue []tmetric.TimeEntry
 	for _, entry := range timeEntries {
-		if entry.Project.Client.Id == config.clientIdInTmetric && entry.Task.ExternalLink.IssueId == "" {
+		if entry.Project.Client.Id == config.ClientIdInTmetric && entry.Task.ExternalLink.IssueId == "" {
 			entriesWithoutIssue = append(entriesWithoutIssue, entry)
 		}
 	}
@@ -164,7 +80,7 @@ func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser
 				workpackageFoundOnOpenProject = true
 				continue
 			}
-			workPackage, err := getWorkpackage(workPackageId, config)
+			workPackage, err := openproject.GetWorkpackage(workPackageId, config)
 
 			if err == nil {
 				workpackageFoundOnOpenProject = true
@@ -182,13 +98,13 @@ func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser
 			updateTmetricConfirmation, err := prompt.Run()
 			if strings.ToLower(updateTmetricConfirmation) == "y" {
 				fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
-				latestTimeEntry, err := createDummyTimeEntry(workPackage, tmetricUser, config)
+				latestTimeEntry, err := tmetric.CreateDummyTimeEntry(workPackage, tmetricUser, config)
 				if err != nil {
 					return err
 				}
-				_ = latestTimeEntry.delete(*config, *tmetricUser)
+				_ = latestTimeEntry.Delete(*config, *tmetricUser)
 				entry.Task = latestTimeEntry.Task
-				err = entry.update(*config, *tmetricUser)
+				err = entry.Update(*config, *tmetricUser)
 				if err != nil {
 					return err
 				}
@@ -198,34 +114,14 @@ func handleEntriesWithoutIssue(timeEntries []TimeEntry, tmetricUser *TmetricUser
 	return nil
 }
 
-func getEntriesWithoutWorkType(timeEntries []TimeEntry, config *Config) []TimeEntry {
-	// get all entries that belong to the client and do not have any work-type set
-	var entriesWithoutWorkType []TimeEntry
-	for _, entry := range timeEntries {
-		if entry.Project.Client.Id == config.clientIdInTmetric {
-			workTypeFound := false
-			for _, tag := range entry.Tags {
-				if tag.IsWorkType {
-					workTypeFound = true
-					break
-				}
-			}
-			if !workTypeFound {
-				entriesWithoutWorkType = append(entriesWithoutWorkType, entry)
-			}
-		}
-	}
-	return entriesWithoutWorkType
-}
-
-func handleEntriesWithoutWorkType(timeEntries []TimeEntry, tmetricUser *TmetricUser, config *Config) error {
-	entriesWithoutWorkType := getEntriesWithoutWorkType(timeEntries, config)
+func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser *tmetric.User, config *config.Config) error {
+	entriesWithoutWorkType := tmetric.GetEntriesWithoutWorkType(timeEntries, config)
 	if len(entriesWithoutWorkType) > 0 {
 		fmt.Println("Some time-entries do not have any work type assigned")
 	}
 
 	for _, entry := range entriesWithoutWorkType {
-		possibleWorkTypes, err := entry.getPossibleWorkTypes(*config, *tmetricUser)
+		possibleWorkTypes, err := entry.GetPossibleWorkTypes(*config, *tmetricUser)
 
 		if err != nil {
 			return err
@@ -264,10 +160,10 @@ func handleEntriesWithoutWorkType(timeEntries []TimeEntry, tmetricUser *TmetricU
 		}
 		updateTmetricConfirmation, err := promptConfirm.Run()
 		if strings.ToLower(updateTmetricConfirmation) == "y" {
-			entry.Tags = append(entry.Tags, Tag{Name: workType, IsWorkType: true})
-			fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
+			entry.Tags = append(entry.Tags, tmetric.Tag{Name: workType, IsWorkType: true})
+			fmt.Printf("updating t-metric entry '%v'\n", entry.Tags)
 
-			err = entry.update(*config, *tmetricUser)
+			err = entry.Update(*config, *tmetricUser)
 			if err != nil {
 				return err
 			}
@@ -292,10 +188,10 @@ var tmetricCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		config := NewConfig()
+		config := config.NewConfig()
 
-		tmetricUser := NewTmetricUser()
-		timeEntries, err := getAllTimeEntries(config, tmetricUser)
+		tmetricUser := tmetric.NewUser()
+		timeEntries, err := tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
