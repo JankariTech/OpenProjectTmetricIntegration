@@ -183,7 +183,7 @@ func Test_GetEntriesWithoutWorkType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GetEntriesWithoutWorkType(tt.args.timeEntries, tt.args.config)
+			result := GetEntriesWithoutWorkType(tt.args.timeEntries)
 			if !reflect.DeepEqual(result, tt.expectedResult) {
 				t.Errorf("got %v, want %v", result, tt.expectedResult)
 			}

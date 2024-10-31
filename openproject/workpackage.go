@@ -22,12 +22,20 @@ import (
 	"fmt"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/go-resty/resty/v2"
+	"github.com/tidwall/gjson"
 	"net/url"
 )
 
 type WorkPackage struct {
 	Subject string `json:"subject"`
 	Id      int    `json:"id"`
+}
+
+func NewWorkPackage(id int, subject string) WorkPackage {
+	return WorkPackage{
+		Id:      id,
+		Subject: subject,
+	}
 }
 
 func GetWorkpackage(workPackageId string, config *config.Config) (WorkPackage, error) {
@@ -50,4 +58,34 @@ func GetWorkpackage(workPackageId string, config *config.Config) (WorkPackage, e
 		)
 	}
 	return workPackage, err
+}
+
+func (w *WorkPackage) GetAllowedActivities(config config.Config) ([]Activity, error) {
+	httpClient := resty.New()
+	openProjectUrl, _ := url.JoinPath(config.OpenProjectUrl, "/api/v3/time_entries/form")
+	body := fmt.Sprintf(`{"_links":{"workPackage":{"href":"/api/v3/work_packages/%d"}}}`, w.Id)
+	resp, err := httpClient.R().
+		SetBasicAuth("apikey", config.OpenProjectToken).
+		SetHeader("Content-Type", "application/json").
+		SetBody(body).
+		Post(openProjectUrl)
+	if err != nil || resp.StatusCode() != 200 {
+		return []Activity{}, fmt.Errorf(
+			"could not fetch allowed activities from '%v'\nError: '%v'. HTTP-Status Code: %v",
+			config.OpenProjectUrl,
+			err,
+			resp.StatusCode(),
+		)
+	}
+
+	activitiesJSON := gjson.GetBytes(resp.Body(), "_embedded.schema.activity._embedded.allowedValues")
+
+	var activities []Activity
+	err = json.Unmarshal([]byte(activitiesJSON.String()), &activities)
+	if err != nil {
+		return []Activity{}, fmt.Errorf(
+			"error parsing work packages response or no work packages found: %v", err,
+		)
+	}
+	return activities, nil
 }

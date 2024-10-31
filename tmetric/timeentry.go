@@ -23,6 +23,7 @@ import (
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/go-resty/resty/v2"
+	"regexp"
 	"strconv"
 )
 
@@ -169,6 +170,14 @@ func (timeEntry *TimeEntry) GetPossibleWorkTypes(config config.Config, user User
 	return workTypes, nil
 }
 
+// GetIssueIdAsInt returns the issue id as an integer
+// the issue Id in tmetric is a string e.g. #1234, but for OpenProject we need the integer to construct the URLs
+func (timeEntry *TimeEntry) GetIssueIdAsInt() (int, error) {
+	issueIdStr := regexp.MustCompile(`#(\d+)`).
+		FindStringSubmatch(timeEntry.Task.ExternalLink.IssueId)[1]
+	return strconv.Atoi(issueIdStr)
+}
+
 /*
 this is the only way to create an external task in tmetric.
 This task is needed to have an issueId of OpenProject assigned to a time entry.
@@ -222,4 +231,13 @@ func CreateDummyTimeEntry(
 		)
 	}
 	return &latestTimeEntry, nil
+}
+
+func (timeEntry *TimeEntry) GetWorkType() (string, error) {
+	for _, tag := range timeEntry.Tags {
+		if tag.IsWorkType {
+			return tag.Name, nil
+		}
+	}
+	return "", fmt.Errorf("no work type found")
 }

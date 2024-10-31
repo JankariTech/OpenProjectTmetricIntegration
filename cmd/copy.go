@@ -1,12 +1,30 @@
 /*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+Copyright © 2024 JankariTech Pvt. Ltd. info@jankaritech.com
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
+
 package cmd
 
 import (
 	"fmt"
-
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/spf13/cobra"
+	"os"
+	"time"
 )
 
 // copyCmd represents the copy command
@@ -14,28 +32,117 @@ var copyCmd = &cobra.Command{
 	Use:   "copy",
 	Short: "Copy time entries from Tmetric to OpenProject",
 	Long:  ``,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		_, err := time.Parse("2006-01-02", startDate)
+		if err != nil {
+			return fmt.Errorf("start date is not in the format YYYY-MM-DD")
+		}
+		_, err = time.Parse("2006-01-02", endDate)
+		if err != nil {
+			return fmt.Errorf("end date is not in the format YYYY-MM-DD")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("copy called")
+		config := config.NewConfig()
+		tmetricUser := tmetric.NewUser()
+		timeEntries, err := tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
+		if err != nil {
+			_, _ = fmt.Fprint(os.Stderr, err)
+			os.Exit(1)
+		}
+		var filteredEntries []tmetric.TimeEntry
+		for _, entry := range timeEntries {
+			hasTransferredTag := false
+			for _, tag := range entry.Tags {
+				if tag.Name == "transferred-to-openproject" {
+					hasTransferredTag = true
+					break
+				}
+			}
+			if !hasTransferredTag {
+				filteredEntries = append(filteredEntries, entry)
+			}
+		}
+		if len(tmetric.GetEntriesWithoutWorkType(filteredEntries)) > 0 {
+			_, _ = fmt.Fprintln(
+				os.Stderr,
+				"Some time-entries do not have any work-type assigned, run the 'check tmetric' command to fix it",
+			)
+			os.Exit(1)
+		}
+
+		if len(tmetric.GetEntriesWithoutLinkToOpenProject(filteredEntries)) > 0 {
+			_, _ = fmt.Fprintln(
+				os.Stderr,
+				"Some time-entries are not linked to an OpenProject work-package, run the 'check tmetric' command to fix it",
+			)
+			os.Exit(1)
+		}
+
+		assignedWorkTypes := tmetric.GetAllAssignedWorkTypes(filteredEntries)
+		fmt.Println("workTypes")
+		for _, workType := range assignedWorkTypes {
+
+			fmt.Println(workType)
+		}
+
+		for _, tmetricTimeEntry := range filteredEntries {
+			issueId, err := tmetricTimeEntry.GetIssueIdAsInt()
+			if err != nil {
+				_, _ = fmt.Fprintln(
+					os.Stderr, err,
+				)
+				os.Exit(1)
+			}
+			workPackage := openproject.WorkPackage{
+				Id: issueId,
+			}
+			activities, err := workPackage.GetAllowedActivities(*config)
+			if err != nil {
+				_, _ = fmt.Fprintln(
+					os.Stderr, err,
+				)
+				os.Exit(1)
+			}
+			fmt.Println("activity.Name")
+			workType, _ := tmetricTimeEntry.GetWorkType()
+			workTypeValid := false
+			for _, activity := range activities {
+				if workType == activity.Name {
+					workTypeValid = true
+					break
+				}
+			}
+			if !workTypeValid {
+				_, _ = fmt.Fprintf(
+					os.Stderr,
+					"work-type %q not valid work-type in OpenProject\n",
+					workType,
+				)
+				os.Exit(1)
+			}
+
+		}
+		//filteredEntries
+
 		// get all time entries from tmetric
 		// filter out those that have the tag 'transferred-to-openproject' set
-		// check if any entry has no work-type assigned or is not linked to an openproject WP, refuse to copy in that case
+		// check if any tmetricTimeEntry has no work-type assigned or is not linked to an openproject WP, refuse to copy in that case
 		// find all work-types and check if there are matching values in openproject, refuse to copy if invalid work-types are found
 		// if all entries are valid:
-		// for each time entry
-		// copy the time entry to openproject
+		// for each time tmetricTimeEntry
+		// copy the time tmetricTimeEntry to openproject
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(copyCmd)
 
-	// Here you will define your flags and configuration settings.
+	firstDayOfMonth := time.Now().Format("2006-01-02")
+	firstDayOfMonth = time.Now().AddDate(0, 0, -time.Now().Day()+1).Format("2006-01-02")
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// copyCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// copyCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	copyCmd.Flags().StringVarP(&startDate, "start", "s", firstDayOfMonth, "start date")
+	today := time.Now().Format("2006-01-02")
+	copyCmd.Flags().StringVarP(&endDate, "end", "e", today, "end date")
 }
