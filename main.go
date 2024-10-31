@@ -21,4 +21,5 @@ import "github.com/JankariTech/OpenProjectTmetricIntegration/cmd"
 
 func main() {
 	cmd.Execute()
+
 }

@@ -15,11 +15,13 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-package cmd
+package tmetric
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/go-resty/resty/v2"
 	"strconv"
 )
@@ -77,7 +79,7 @@ type DummyTimeEntry struct {
 	ProjectId   int `json:"projectId"`
 }
 
-func newDummyTimeEntry(workPackage WorkPackage, openProjectUrl string, projectId int) *DummyTimeEntry {
+func NewDummyTimeEntry(workPackage openproject.WorkPackage, openProjectUrl string, projectId int) *DummyTimeEntry {
 	return &DummyTimeEntry{
 		IsStarted:   true,
 		ShowIssueId: true,
@@ -92,14 +94,14 @@ func newDummyTimeEntry(workPackage WorkPackage, openProjectUrl string, projectId
 	}
 }
 
-func (timeEntry *TimeEntry) delete(config Config, user TmetricUser) error {
+func (timeEntry *TimeEntry) Delete(config config.Config, user User) error {
 	httpClient := resty.New()
 	_, err := httpClient.R().
-		SetAuthToken(config.tmetricToken).
+		SetAuthToken(config.TmetricToken).
 		Delete(
 			fmt.Sprintf(
 				`%vaccounts/%v/timeentries/%v`,
-				config.tmetricAPIV3BaseUrl,
+				config.TmetricAPIV3BaseUrl,
 				user.ActiveAccountId,
 				timeEntry.Id,
 			),
@@ -107,20 +109,20 @@ func (timeEntry *TimeEntry) delete(config Config, user TmetricUser) error {
 	return err
 }
 
-func (timeEntry *TimeEntry) update(config Config, user TmetricUser) error {
+func (timeEntry *TimeEntry) Update(config config.Config, user User) error {
 	entryJSON, err := json.Marshal(timeEntry)
 	if err != nil {
 		return fmt.Errorf("error marshalling tmetric entry to JSON: %v", err)
 	}
 	httpClient := resty.New()
 	resp, err := httpClient.R().
-		SetAuthToken(config.tmetricToken).
+		SetAuthToken(config.TmetricToken).
 		SetHeader("Content-Type", "application/json").
 		SetBody(entryJSON).
 		Put(
 			fmt.Sprintf(
 				`%vaccounts/%v/timeentries/%v`,
-				config.tmetricAPIV3BaseUrl,
+				config.TmetricAPIV3BaseUrl,
 				user.ActiveAccountId,
 				timeEntry.Id,
 			),
@@ -134,16 +136,16 @@ func (timeEntry *TimeEntry) update(config Config, user TmetricUser) error {
 	return nil
 }
 
-func (timeEntry *TimeEntry) getPossibleWorkTypes(config Config, user TmetricUser) ([]Tag, error) {
+func (timeEntry *TimeEntry) GetPossibleWorkTypes(config config.Config, user User) ([]Tag, error) {
 	httpClient := resty.New()
 
 	resp, err := httpClient.R().
-		SetAuthToken(config.tmetricToken).
+		SetAuthToken(config.TmetricToken).
 		SetHeader("Content-Type", "application/json").
 		SetQueryParam("projectId", strconv.Itoa(timeEntry.Project.Id)).
 		Get(fmt.Sprintf(
 			`%vaccounts/%v/timeentries/tags`,
-			config.tmetricAPIV3BaseUrl,
+			config.TmetricAPIV3BaseUrl,
 			user.ActiveAccountId,
 		))
 	if err != nil || resp.StatusCode() != 200 {
@@ -165,4 +167,59 @@ func (timeEntry *TimeEntry) getPossibleWorkTypes(config Config, user TmetricUser
 		}
 	}
 	return workTypes, nil
+}
+
+/*
+this is the only way to create an external task in tmetric.
+This task is needed to have an issueId of OpenProject assigned to a time entry.
+*/
+func CreateDummyTimeEntry(
+	workPackage openproject.WorkPackage, tmetricUser *User, config *config.Config,
+) (*TimeEntry, error) {
+	dummyTimeEntry := NewDummyTimeEntry(workPackage, config.OpenProjectUrl, config.TmetricDummyProjectId)
+	dummyTimerString, _ := json.Marshal(dummyTimeEntry)
+	httpClient := resty.New()
+	resp, err := httpClient.R().
+		SetAuthToken(config.TmetricToken).
+		SetHeader("Content-Type", "application/json").
+		SetBody(dummyTimerString).
+		Post(fmt.Sprintf(
+			`%vaccounts/%v/timer/issue`,
+			config.TmetricAPIBaseUrl,
+			tmetricUser.ActiveAccountId,
+		))
+	if err != nil || resp.StatusCode() != 200 {
+		return nil, fmt.Errorf(
+			"could not create dummy time entry. Is 'tmetric.dummyProjectId' set correctly in the config?\n"+
+				"Error : '%v'. HTTP-Status-Code: %v",
+			err, resp.StatusCode(),
+		)
+	}
+
+	resp, err = httpClient.R().
+		SetAuthToken(config.TmetricToken).
+		SetQueryString("userId=" + strconv.Itoa(tmetricUser.Id)).
+		Get(
+			fmt.Sprintf(
+				`%vaccounts/%v/timeentries/latest`,
+				config.TmetricAPIV3BaseUrl,
+				tmetricUser.ActiveAccountId,
+			),
+		)
+
+	if err != nil || resp.StatusCode() != 200 {
+		return nil, fmt.Errorf(
+			"could not find latest time entry. Error : '%v'. HTTP-Status-Code: %v",
+			err, resp.StatusCode(),
+		)
+	}
+	latestTimeEntry := TimeEntry{}
+	err = json.Unmarshal(resp.Body(), &latestTimeEntry)
+
+	if err != nil || latestTimeEntry.Note != "to-delete-only-created-to-create-an-external-task" {
+		return nil, fmt.Errorf(
+			"could not find dummy time entry",
+		)
+	}
+	return &latestTimeEntry, nil
 }

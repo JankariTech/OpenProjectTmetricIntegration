@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-package cmd
+package config
 
 import (
 	"fmt"
@@ -24,13 +24,13 @@ import (
 )
 
 type Config struct {
-	openProjectUrl        string
-	openProjectToken      string
-	tmetricToken          string
-	clientIdInTmetric     int
-	tmetricAPIBaseUrl     string
-	tmetricAPIV3BaseUrl   string
-	tmetricDummyProjectId int
+	OpenProjectUrl        string
+	OpenProjectToken      string
+	TmetricToken          string
+	ClientIdInTmetric     int
+	TmetricAPIBaseUrl     string
+	TmetricAPIV3BaseUrl   string
+	TmetricDummyProjectId int
 }
 
 func NewConfig() *Config {
@@ -60,12 +60,12 @@ func NewConfig() *Config {
 		os.Exit(1)
 	}
 	return &Config{
-		openProjectUrl:        openProjectUrl,
-		openProjectToken:      openProjectToken,
-		tmetricToken:          tmetricToken,
-		clientIdInTmetric:     clientIdInTmetric,
-		tmetricAPIBaseUrl:     "https://app.tmetric.com/api/",
-		tmetricAPIV3BaseUrl:   "https://app.tmetric.com/api/v3/",
-		tmetricDummyProjectId: tmetricDummyProjectId,
+		OpenProjectUrl:        openProjectUrl,
+		OpenProjectToken:      openProjectToken,
+		TmetricToken:          tmetricToken,
+		ClientIdInTmetric:     clientIdInTmetric,
+		TmetricAPIBaseUrl:     "https://app.tmetric.com/api/",
+		TmetricAPIV3BaseUrl:   "https://app.tmetric.com/api/v3/",
+		TmetricDummyProjectId: tmetricDummyProjectId,
 	}
 }

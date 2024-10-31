@@ -15,29 +15,30 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-package cmd
+package tmetric
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/go-resty/resty/v2"
 	"os"
 )
 
-type TmetricUser struct {
+type User struct {
 	Id              int    `json:"id"`
 	Name            string `json:"name"`
 	ActiveAccountId int    `json:"activeAccountId"`
 }
 
-func NewTmetricUser() *TmetricUser {
-	config := NewConfig()
+func NewUser() *User {
+	config := config.NewConfig()
 
 	httpClient := resty.New()
 
 	resp, err := httpClient.R().
-		SetAuthToken(config.tmetricToken).
-		Get(config.tmetricAPIV3BaseUrl + "user")
+		SetAuthToken(config.TmetricToken).
+		Get(config.TmetricAPIV3BaseUrl + "user")
 	if err != nil || resp.StatusCode() != 200 {
 		fmt.Fprintf(os.Stderr, "cannot reach tmetric server\n")
 		if err != nil {
@@ -47,7 +48,7 @@ func NewTmetricUser() *TmetricUser {
 		}
 		os.Exit(1)
 	}
-	var user TmetricUser
+	var user User
 	err = json.Unmarshal(resp.Body(), &user)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error parsing response: %v\n", err)
