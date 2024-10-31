@@ -161,7 +161,7 @@ func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser *
 		updateTmetricConfirmation, err := promptConfirm.Run()
 		if strings.ToLower(updateTmetricConfirmation) == "y" {
 			entry.Tags = append(entry.Tags, tmetric.Tag{Name: workType, IsWorkType: true})
-			fmt.Printf("updating t-metric entry '%v'\n", entry.Tags)
+			fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
 
 			err = entry.Update(*config, *tmetricUser)
 			if err != nil {
