@@ -201,6 +201,13 @@ var tmetricCmd = &cobra.Command{
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
+
+		// after and update time entries receive a new id, so we need to fetch them again
+		timeEntries, err = tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
+		if err != nil {
+			_, _ = fmt.Fprint(os.Stderr, err)
+			os.Exit(1)
+		}
 		err = handleEntriesWithoutWorkType(timeEntries, tmetricUser, config)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
