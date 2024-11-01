@@ -80,13 +80,6 @@ var copyCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		assignedWorkTypes := tmetric.GetAllAssignedWorkTypes(filteredEntries)
-		fmt.Println("workTypes")
-		for _, workType := range assignedWorkTypes {
-
-			fmt.Println(workType)
-		}
-
 		for _, tmetricTimeEntry := range filteredEntries {
 			issueId, err := tmetricTimeEntry.GetIssueIdAsInt()
 			if err != nil {
@@ -105,24 +98,36 @@ var copyCmd = &cobra.Command{
 				)
 				os.Exit(1)
 			}
-			fmt.Println("activity.Name")
 			workType, _ := tmetricTimeEntry.GetWorkType()
 			workTypeValid := false
+			var activityId int
 			for _, activity := range activities {
 				if workType == activity.Name {
 					workTypeValid = true
+					activityId = activity.Id
 					break
 				}
 			}
 			if !workTypeValid {
 				_, _ = fmt.Fprintf(
 					os.Stderr,
-					"work-type %q not valid work-type in OpenProject\n",
+					"Work Type '%v' in time entry '%v' project '%v' is not a valid activity in OpenProject\n",
 					workType,
+					tmetricTimeEntry.Note,
+					tmetricTimeEntry.Project.Name,
 				)
 				os.Exit(1)
 			}
-
+			openProjectTimeEntry, err := tmetricTimeEntry.ConvertToOpenProjectTimeEntry(activityId)
+			if err != nil {
+				_, _ = fmt.Fprintf(
+					os.Stderr,
+					"could not convert time entry '%v' in project '%v' started at '%v' from tmetric to OpenProject\n",
+					tmetricTimeEntry.Note, tmetricTimeEntry.Project, tmetricTimeEntry.StartTime,
+				)
+				os.Exit(1)
+			}
+			fmt.Fprintf(os.Stderr, "openProjectTimeEntry: %v\n", openProjectTimeEntry)
 		}
 		//filteredEntries
 

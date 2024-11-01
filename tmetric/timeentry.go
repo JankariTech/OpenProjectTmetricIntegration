@@ -25,6 +25,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 type ExternalLink struct {
@@ -240,4 +241,49 @@ func (timeEntry *TimeEntry) GetWorkType() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no work type found")
+}
+
+func (timeEntry *TimeEntry) ConvertToOpenProjectTimeEntry(activityId int) (openproject.TimeEntry, error) {
+	opTimeEntry := openproject.TimeEntry{
+		Ongoing: false,
+	}
+	opTimeEntry.Comment.Raw = timeEntry.Note
+	issueId, err := timeEntry.GetIssueIdAsInt()
+	if err != nil {
+		return openproject.TimeEntry{}, err
+	}
+	opTimeEntry.Links.WorkPackage.Href = fmt.Sprintf("/api/v3/work_packages/%d", issueId)
+	opTimeEntry.Links.Activity.Href = fmt.Sprintf("/api/v3/time_entries/activities/%d", activityId)
+	iso8601Duration, spentOn, err := timeEntry.getIso8601Duration()
+	if err != nil {
+		return openproject.TimeEntry{}, err
+	}
+	opTimeEntry.Hours = iso8601Duration
+	opTimeEntry.SpentOn = spentOn
+	return opTimeEntry, err
+}
+
+func (timeEntry *TimeEntry) getIso8601Duration() (string, string, error) {
+	startTimeParsed, err := time.Parse("2006-01-02T15:04:05", timeEntry.StartTime)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse startTime: %v", err)
+	}
+	endTimeParsed, err := time.Parse("2006-01-02T15:04:05", timeEntry.EndTime)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse endTime: %v", err)
+	}
+	duration := endTimeParsed.Sub(startTimeParsed)
+	if duration < 0 {
+		return "", "", fmt.Errorf("end time is before start time")
+	}
+
+	iso8601Duration := fmt.Sprintf(
+		"P%dDT%dH%dM%dS",
+		int(duration.Hours()/24),
+		int(duration.Hours())%24,
+		int(duration.Minutes())%60,
+		int(duration.Seconds())%60,
+	)
+	spentOn := startTimeParsed.Format("2006-01-02")
+	return iso8601Duration, spentOn, nil
 }
