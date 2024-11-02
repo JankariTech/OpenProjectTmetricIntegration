@@ -187,6 +187,8 @@ func CreateDummyTimeEntry(
 	workPackage openproject.WorkPackage, tmetricUser *User, config *config.Config,
 ) (*TimeEntry, error) {
 	dummyTimeEntry := NewDummyTimeEntry(workPackage, config.OpenProjectUrl, config.TmetricDummyProjectId)
+	// the serviceUrl for the dummy task has always to be "https://community.openproject.org"
+	// otherwise tmetric does not recognize the integration and does not allow to create the external task
 	dummyTimeEntry.ServiceUrl = "https://community.openproject.org"
 	dummyTimerString, _ := json.Marshal(dummyTimeEntry)
 	httpClient := resty.New()
@@ -244,7 +246,7 @@ func (timeEntry *TimeEntry) GetWorkType() (string, error) {
 	return "", fmt.Errorf("no work type found")
 }
 
-func (timeEntry *TimeEntry) ConvertToOpenProjectTimeEntry(activityId int) (openproject.TimeEntry, error) {
+func (timeEntry *TimeEntry) ConvertToOpenProjectTimeEntry(activity openproject.Activity) (openproject.TimeEntry, error) {
 	opTimeEntry := openproject.TimeEntry{
 		Ongoing: false,
 	}
@@ -254,7 +256,7 @@ func (timeEntry *TimeEntry) ConvertToOpenProjectTimeEntry(activityId int) (openp
 		return openproject.TimeEntry{}, err
 	}
 	opTimeEntry.Links.WorkPackage.Href = fmt.Sprintf("/api/v3/work_packages/%d", issueId)
-	opTimeEntry.Links.Activity.Href = fmt.Sprintf("/api/v3/time_entries/activities/%d", activityId)
+	opTimeEntry.Links.Activity.Href = fmt.Sprintf("/api/v3/time_entries/activities/%d", activity.Id)
 	iso8601Duration, spentOn, err := timeEntry.getIso8601Duration()
 	if err != nil {
 		return openproject.TimeEntry{}, err
@@ -287,4 +289,8 @@ func (timeEntry *TimeEntry) getIso8601Duration() (string, string, error) {
 	)
 	spentOn := startTimeParsed.Format("2006-01-02")
 	return iso8601Duration, spentOn, nil
+}
+
+func (timeEntry *TimeEntry) TagAsTransferredToOpenProject(config config.Config) {
+	timeEntry.Tags = append(timeEntry.Tags, Tag{Name: config.TmetricTagTransferredToOpenProject})
 }

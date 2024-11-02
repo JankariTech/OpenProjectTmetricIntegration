@@ -56,7 +56,7 @@ var copyCmd = &cobra.Command{
 		for _, entry := range timeEntries {
 			hasTransferredTag := false
 			for _, tag := range entry.Tags {
-				if tag.Name == "transferred-to-openproject" {
+				if tag.Name == config.TmetricTagTransferredToOpenProject {
 					hasTransferredTag = true
 					break
 				}
@@ -89,37 +89,32 @@ var copyCmd = &cobra.Command{
 				)
 				os.Exit(1)
 			}
-			workPackage := openproject.WorkPackage{
-				Id: issueId,
-			}
-			activities, err := workPackage.GetAllowedActivities(*config)
+
+			workType, err := tmetricTimeEntry.GetWorkType()
 			if err != nil {
-				_, _ = fmt.Fprintln(
-					os.Stderr, err,
-				)
-				os.Exit(1)
-			}
-			workType, _ := tmetricTimeEntry.GetWorkType()
-			workTypeValid := false
-			var activityId int
-			for _, activity := range activities {
-				if workType == activity.Name {
-					workTypeValid = true
-					activityId = activity.Id
-					break
-				}
-			}
-			if !workTypeValid {
 				_, _ = fmt.Fprintf(
 					os.Stderr,
-					"Work Type '%v' in time entry '%v' project '%v' is not a valid activity in OpenProject\n",
-					workType,
+					"Error with time entry '%v' in project '%v'\nError: %v\n",
 					tmetricTimeEntry.Note,
 					tmetricTimeEntry.Project.Name,
+					err,
 				)
 				os.Exit(1)
 			}
-			openProjectTimeEntry, err := tmetricTimeEntry.ConvertToOpenProjectTimeEntry(activityId)
+
+			activity, err := openproject.NewFromWorkType(*config, issueId, workType)
+			if err != nil {
+				_, _ = fmt.Fprintf(
+					os.Stderr,
+					"Error with time entry '%v' in project '%v'\nError: %v\n",
+					tmetricTimeEntry.Note,
+					tmetricTimeEntry.Project.Name,
+					err,
+				)
+				os.Exit(1)
+			}
+
+			openProjectTimeEntry, err := tmetricTimeEntry.ConvertToOpenProjectTimeEntry(activity)
 			if err != nil {
 				_, _ = fmt.Fprintf(
 					os.Stderr,
@@ -129,7 +124,7 @@ var copyCmd = &cobra.Command{
 				)
 				os.Exit(1)
 			}
-			fmt.Fprintf(os.Stderr, "openProjectTimeEntry: %v\n", openProjectTimeEntry)
+
 			err = openProjectTimeEntry.Save(*config)
 			if err != nil {
 				_, _ = fmt.Fprintf(
@@ -143,7 +138,8 @@ var copyCmd = &cobra.Command{
 				)
 				os.Exit(1)
 			}
-			tmetricTimeEntry.Tags = append(tmetricTimeEntry.Tags, tmetric.Tag{Name: "transferred-to-openproject"})
+
+			tmetricTimeEntry.TagAsTransferredToOpenProject(*config)
 			tmetricUser = tmetric.NewUser()
 			err = tmetricTimeEntry.Update(*config, *tmetricUser)
 			if err != nil {

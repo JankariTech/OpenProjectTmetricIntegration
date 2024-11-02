@@ -92,7 +92,7 @@ func (w *WorkPackage) GetAllowedActivities(config config.Config) ([]Activity, er
 	}
 	if validationErrorJSON.Exists() {
 		return []Activity{}, fmt.Errorf(
-			"work packages '%v' not found. Error: %v", w.Id, validationErrorJSON.String(),
+			"work package '%v' not found. Error: %v", w.Id, validationErrorJSON.String(),
 		)
 	}
 	return activities, nil
