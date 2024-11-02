@@ -24,6 +24,7 @@ import (
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/spf13/cobra"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -122,22 +123,39 @@ var copyCmd = &cobra.Command{
 			if err != nil {
 				_, _ = fmt.Fprintf(
 					os.Stderr,
-					"could not convert time entry '%v' in project '%v' started at '%v' from tmetric to OpenProject\n",
-					tmetricTimeEntry.Note, tmetricTimeEntry.Project, tmetricTimeEntry.StartTime,
+					"could not convert time entry '%v' in project '%v' started at '%v' from tmetric to OpenProject\n"+
+						"Error: %v\n",
+					tmetricTimeEntry.Note, tmetricTimeEntry.Project, tmetricTimeEntry.StartTime, err,
 				)
 				os.Exit(1)
 			}
 			fmt.Fprintf(os.Stderr, "openProjectTimeEntry: %v\n", openProjectTimeEntry)
+			err = openProjectTimeEntry.Save(*config)
+			if err != nil {
+				_, _ = fmt.Fprintf(
+					os.Stderr,
+					"could not save time entry '%v' for work package '%v' spend on '%v' in OpenProject\n"+
+						"Error: %v\n",
+					openProjectTimeEntry.Comment.Raw,
+					filepath.Base(openProjectTimeEntry.Links.WorkPackage.Href),
+					openProjectTimeEntry.SpentOn,
+					err,
+				)
+				os.Exit(1)
+			}
+			tmetricTimeEntry.Tags = append(tmetricTimeEntry.Tags, tmetric.Tag{Name: "transferred-to-openproject"})
+			tmetricUser = tmetric.NewUser()
+			err = tmetricTimeEntry.Update(*config, *tmetricUser)
+			if err != nil {
+				_, _ = fmt.Fprintf(
+					os.Stderr,
+					"could not tag tmetric entry as being transferred to openproject\n"+
+						"Error: %v\n",
+					err,
+				)
+				os.Exit(1)
+			}
 		}
-		//filteredEntries
-
-		// get all time entries from tmetric
-		// filter out those that have the tag 'transferred-to-openproject' set
-		// check if any tmetricTimeEntry has no work-type assigned or is not linked to an openproject WP, refuse to copy in that case
-		// find all work-types and check if there are matching values in openproject, refuse to copy if invalid work-types are found
-		// if all entries are valid:
-		// for each time tmetricTimeEntry
-		// copy the time tmetricTimeEntry to openproject
 	},
 }
 

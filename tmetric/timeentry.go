@@ -187,6 +187,7 @@ func CreateDummyTimeEntry(
 	workPackage openproject.WorkPackage, tmetricUser *User, config *config.Config,
 ) (*TimeEntry, error) {
 	dummyTimeEntry := NewDummyTimeEntry(workPackage, config.OpenProjectUrl, config.TmetricDummyProjectId)
+	dummyTimeEntry.ServiceUrl = "https://community.openproject.org"
 	dummyTimerString, _ := json.Marshal(dummyTimeEntry)
 	httpClient := resty.New()
 	resp, err := httpClient.R().

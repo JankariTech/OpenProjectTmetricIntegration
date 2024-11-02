@@ -71,7 +71,10 @@ func (w *WorkPackage) GetAllowedActivities(config config.Config) ([]Activity, er
 		Post(openProjectUrl)
 	if err != nil || resp.StatusCode() != 200 {
 		return []Activity{}, fmt.Errorf(
-			"could not fetch allowed activities from '%v'\nError: '%v'. HTTP-Status Code: %v",
+			"could not fetch allowed activities for work package '%v' from '%v'.\n"+
+				"Are 'Time and costs' activated for the project?\n"+
+				"Error: '%v'. HTTP-Status Code: %v",
+			w.Id,
 			config.OpenProjectUrl,
 			err,
 			resp.StatusCode(),
@@ -79,12 +82,17 @@ func (w *WorkPackage) GetAllowedActivities(config config.Config) ([]Activity, er
 	}
 
 	activitiesJSON := gjson.GetBytes(resp.Body(), "_embedded.schema.activity._embedded.allowedValues")
-
+	validationErrorJSON := gjson.GetBytes(resp.Body(), "_embedded.validationErrors.workPackage.message")
 	var activities []Activity
 	err = json.Unmarshal([]byte(activitiesJSON.String()), &activities)
 	if err != nil {
 		return []Activity{}, fmt.Errorf(
 			"error parsing work packages response or no work packages found: %v", err,
+		)
+	}
+	if validationErrorJSON.Exists() {
+		return []Activity{}, fmt.Errorf(
+			"work packages '%v' not found. Error: %v", w.Id, validationErrorJSON.String(),
 		)
 	}
 	return activities, nil
