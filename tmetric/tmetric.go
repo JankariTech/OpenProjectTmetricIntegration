@@ -42,6 +42,24 @@ func GetAllTimeEntries(config *config.Config, tmetricUser *User, startDate strin
 	return timeEntriesOfTheSelectedClient, nil
 }
 
+func GetEntriesNotTransferredToOpenProject(timeEntries []TimeEntry, TmetricTagTransferredToOpenProject string) []TimeEntry {
+	var filteredEntries []TimeEntry
+	for _, entry := range timeEntries {
+		hasTransferredTag := false
+		for _, tag := range entry.Tags {
+			if tag.Name == TmetricTagTransferredToOpenProject {
+				hasTransferredTag = true
+				break
+			}
+		}
+		if !hasTransferredTag {
+			filteredEntries = append(filteredEntries, entry)
+		}
+	}
+
+	return filteredEntries
+}
+
 func GetEntriesWithoutWorkType(timeEntries []TimeEntry) []TimeEntry {
 	// get all entries that belong to the client and do not have any work-type set
 	var entriesWithoutWorkType []TimeEntry

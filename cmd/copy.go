@@ -52,20 +52,8 @@ var copyCmd = &cobra.Command{
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-		var filteredEntries []tmetric.TimeEntry
-		for _, entry := range timeEntries {
-			hasTransferredTag := false
-			for _, tag := range entry.Tags {
-				if tag.Name == config.TmetricTagTransferredToOpenProject {
-					hasTransferredTag = true
-					break
-				}
-			}
-			if !hasTransferredTag {
-				filteredEntries = append(filteredEntries, entry)
-			}
-		}
-		if len(tmetric.GetEntriesWithoutWorkType(filteredEntries)) > 0 {
+
+		if len(tmetric.GetEntriesWithoutWorkType(timeEntries)) > 0 {
 			_, _ = fmt.Fprintln(
 				os.Stderr,
 				"Some time-entries do not have any work-type assigned, run the 'check tmetric' command to fix it",
@@ -73,13 +61,17 @@ var copyCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if len(tmetric.GetEntriesWithoutLinkToOpenProject(filteredEntries)) > 0 {
+		if len(tmetric.GetEntriesWithoutLinkToOpenProject(timeEntries)) > 0 {
 			_, _ = fmt.Fprintln(
 				os.Stderr,
 				"Some time-entries are not linked to an OpenProject work-package, run the 'check tmetric' command to fix it",
 			)
 			os.Exit(1)
 		}
+
+		filteredEntries := tmetric.GetEntriesNotTransferredToOpenProject(
+			timeEntries, config.TmetricTagTransferredToOpenProject,
+		)
 
 		for _, tmetricTimeEntry := range filteredEntries {
 			issueId, err := tmetricTimeEntry.GetIssueIdAsInt()
