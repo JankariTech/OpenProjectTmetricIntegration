@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/go-chrono/chrono"
 	"github.com/go-resty/resty/v2"
 	"net/url"
+	"time"
 )
 
 type TimeEntry struct {
@@ -44,4 +46,21 @@ func (timeEntry TimeEntry) Save(config config.Config) error {
 		)
 	}
 	return nil
+}
+func (timeEntry TimeEntry) GetDuration() (time.Duration, error) {
+	_, duration, err := chrono.ParseDuration(timeEntry.Hours)
+	if err != nil {
+		return 0, fmt.Errorf("could not parse duration: %v", err)
+	}
+	return time.Duration(duration.Nanoseconds()), nil
+}
+
+func (timeEntry TimeEntry) GetHumanReadableDuration() (string, error) {
+	duration, err := timeEntry.GetDuration()
+	if err != nil {
+		return "", err
+	}
+	readableDuration := fmt.Sprintf("%02d:%02d", int(duration.Hours()), int(duration.Minutes())%60)
+
+	return readableDuration, nil
 }

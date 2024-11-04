@@ -31,9 +31,6 @@ import (
 	"time"
 )
 
-var startDate string
-var endDate string
-
 func validateOpenProjectWorkPackage(input string) error {
 	if len(input) > 0 {
 		_, err := strconv.ParseInt(input, 10, 32)

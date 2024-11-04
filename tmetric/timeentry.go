@@ -257,7 +257,7 @@ func (timeEntry *TimeEntry) ConvertToOpenProjectTimeEntry(activity openproject.A
 	}
 	opTimeEntry.Links.WorkPackage.Href = fmt.Sprintf("/api/v3/work_packages/%d", issueId)
 	opTimeEntry.Links.Activity.Href = fmt.Sprintf("/api/v3/time_entries/activities/%d", activity.Id)
-	iso8601Duration, spentOn, err := timeEntry.getIso8601Duration()
+	iso8601Duration, spentOn, err := timeEntry.GetIso8601Duration()
 	if err != nil {
 		return openproject.TimeEntry{}, err
 	}
@@ -266,19 +266,41 @@ func (timeEntry *TimeEntry) ConvertToOpenProjectTimeEntry(activity openproject.A
 	return opTimeEntry, err
 }
 
-func (timeEntry *TimeEntry) getIso8601Duration() (string, string, error) {
-	startTimeParsed, err := time.Parse("2006-01-02T15:04:05", timeEntry.StartTime)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to parse startTime: %v", err)
+func (timeEntry *TimeEntry) getParsedTime(startTime bool) (time.Time, error) {
+	stringToParse := ""
+	if startTime {
+		stringToParse = timeEntry.StartTime
+	} else {
+		stringToParse = timeEntry.EndTime
 	}
-	endTimeParsed, err := time.Parse("2006-01-02T15:04:05", timeEntry.EndTime)
+
+	timeParsed, err := time.Parse("2006-01-02T15:04:05", stringToParse)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to parse endTime: %v", err)
+		return time.Time{}, fmt.Errorf("failed to parse time: %v", err)
 	}
+	return timeParsed, nil
+}
+
+func (timeEntry *TimeEntry) GetDuration() (time.Duration, error) {
+	startTimeParsed, err := timeEntry.getParsedTime(true)
+	if err != nil {
+		return 0, err
+	}
+	endTimeParsed, err := timeEntry.getParsedTime(false)
+	if err != nil {
+		return 0, err
+	}
+
 	duration := endTimeParsed.Sub(startTimeParsed)
 	if duration < 0 {
-		return "", "", fmt.Errorf("end time is before start time")
+		return 0, fmt.Errorf("end time is before start time")
 	}
+
+	return duration, nil
+}
+
+func (timeEntry *TimeEntry) GetIso8601Duration() (string, string, error) {
+	duration, err := timeEntry.GetDuration()
 
 	iso8601Duration := fmt.Sprintf(
 		"P%dDT%dH%dM%dS",
@@ -287,8 +309,23 @@ func (timeEntry *TimeEntry) getIso8601Duration() (string, string, error) {
 		int(duration.Minutes())%60,
 		int(duration.Seconds())%60,
 	)
+	startTimeParsed, err := timeEntry.getParsedTime(true)
+	if err != nil {
+		return "", "", err
+	}
 	spentOn := startTimeParsed.Format("2006-01-02")
 	return iso8601Duration, spentOn, nil
+}
+
+func (timeEntry *TimeEntry) GetHumanReadableDuration() (string, error) {
+	duration, err := timeEntry.GetDuration()
+	if err != nil {
+		return "", err
+	}
+
+	readableDuration := fmt.Sprintf("%02d:%02d", int(duration.Hours()), int(duration.Minutes())%60)
+
+	return readableDuration, nil
 }
 
 func (timeEntry *TimeEntry) TagAsTransferredToOpenProject(config config.Config) {
