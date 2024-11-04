@@ -57,6 +57,9 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser *tme
 		fmt.Println("Some time-entries do not have any workpackages assigned")
 	}
 
+	spinner := newSpinner()
+	defer spinner.Stop()
+
 	for _, entry := range entriesWithoutIssue {
 		prompt := promptui.Prompt{
 			Label: fmt.Sprintf(
@@ -96,8 +99,11 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser *tme
 				IsConfirm: true,
 			}
 			updateTmetricConfirmation, err := prompt.Run()
+
 			if strings.ToLower(updateTmetricConfirmation) == "y" {
-				fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
+				spinner.Start()
+				spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
+				spinner.FinalMSG = "❌\n"
 				latestTimeEntry, err := tmetric.CreateDummyTimeEntry(workPackage, tmetricUser, config)
 				if err != nil {
 					return err
@@ -108,6 +114,8 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser *tme
 				if err != nil {
 					return err
 				}
+				spinner.FinalMSG = "✔️\n"
+				spinner.Stop()
 			}
 		}
 	}
@@ -120,6 +128,8 @@ func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser *
 		fmt.Println("Some time-entries do not have any work type assigned")
 	}
 
+	spinner := newSpinner()
+	defer spinner.Stop()
 	for _, entry := range entriesWithoutWorkType {
 		possibleWorkTypes, err := entry.GetPossibleWorkTypes(*config, *tmetricUser)
 
@@ -161,12 +171,16 @@ func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser *
 		updateTmetricConfirmation, err := promptConfirm.Run()
 		if strings.ToLower(updateTmetricConfirmation) == "y" {
 			entry.Tags = append(entry.Tags, tmetric.Tag{Name: workType, IsWorkType: true})
-			fmt.Printf("updating t-metric entry '%v'\n", entry.Note)
+			spinner.Start()
+			spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
+			spinner.FinalMSG = "❌\n"
 
 			err = entry.Update(*config, *tmetricUser)
 			if err != nil {
 				return err
 			}
+			spinner.FinalMSG = "✔️\n"
+			spinner.Stop()
 		}
 	}
 	return nil

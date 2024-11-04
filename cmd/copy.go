@@ -28,6 +28,106 @@ import (
 	"time"
 )
 
+func checkTmetricEntries(tmetricUser *tmetric.User, config *config.Config) ([]tmetric.TimeEntry, error) {
+	spinner := newSpinner()
+	defer spinner.Stop()
+	spinner.Prefix = "Checking time entries in Tmetric... "
+	spinner.FinalMSG = "❌\n"
+	timeEntries, err := tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(tmetric.GetEntriesWithoutWorkType(timeEntries)) > 0 {
+		return nil, fmt.Errorf(
+			"some time-entries do not have any work-type assigned, run the 'check tmetric' command to fix it",
+		)
+	}
+
+	if len(tmetric.GetEntriesWithoutLinkToOpenProject(timeEntries)) > 0 {
+		return nil, fmt.Errorf(
+			"some time-entries are not linked to an OpenProject work-package, run the 'check tmetric' command to fix it",
+		)
+	}
+
+	filteredEntries := tmetric.GetEntriesNotTransferredToOpenProject(
+		timeEntries, config.TmetricTagTransferredToOpenProject,
+	)
+
+	spinner.FinalMSG = "✔️\n"
+	return filteredEntries, err
+}
+
+func transferEntryToOpenProject(
+	tmetricTimeEntry tmetric.TimeEntry, tmetricUser *tmetric.User, config *config.Config,
+) error {
+	spinner := newSpinner()
+	defer spinner.Stop()
+	spinner.FinalMSG = "❌\n"
+	spinner.Prefix = fmt.Sprintf(
+		"Transferring data to OpenProject. Project: '%v', Note: '%v', Start: '%v' ", tmetricTimeEntry.Project.Name, tmetricTimeEntry.Note, tmetricTimeEntry.StartTime,
+	)
+	spinner.Restart()
+	issueId, err := tmetricTimeEntry.GetIssueIdAsInt()
+	if err != nil {
+		return err
+	}
+
+	workType, err := tmetricTimeEntry.GetWorkType()
+	if err != nil {
+		return fmt.Errorf(
+			"Error with time entry '%v' in project '%v'\nError: %v\n",
+			tmetricTimeEntry.Note,
+			tmetricTimeEntry.Project.Name,
+			err,
+		)
+	}
+
+	activity, err := openproject.NewActivityFromWorkType(*config, issueId, workType)
+	if err != nil {
+		return fmt.Errorf(
+			"Error with time entry '%v' in project '%v'\nError: %v\n",
+			tmetricTimeEntry.Note,
+			tmetricTimeEntry.Project.Name,
+			err,
+		)
+	}
+
+	openProjectTimeEntry, err := tmetricTimeEntry.ConvertToOpenProjectTimeEntry(activity)
+	if err != nil {
+		return fmt.Errorf(
+			"could not convert time entry '%v' in project '%v' started at '%v' from tmetric to OpenProject\n"+
+				"Error: %v\n",
+			tmetricTimeEntry.Note, tmetricTimeEntry.Project, tmetricTimeEntry.StartTime, err,
+		)
+	}
+
+	err = openProjectTimeEntry.Save(*config)
+	if err != nil {
+		return fmt.Errorf(
+			"could not save time entry '%v' for work package '%v' spend on '%v' in OpenProject\n"+
+				"Error: %v\n",
+			openProjectTimeEntry.Comment.Raw,
+			filepath.Base(openProjectTimeEntry.Links.WorkPackage.Href),
+			openProjectTimeEntry.SpentOn,
+			err,
+		)
+	}
+
+	tmetricTimeEntry.TagAsTransferredToOpenProject(*config)
+	tmetricUser = tmetric.NewUser()
+	err = tmetricTimeEntry.Update(*config, *tmetricUser)
+	if err != nil {
+		return fmt.Errorf(
+			"could not tag tmetric entry as being transferred to openproject\n"+
+				"Error: %v\n",
+			err,
+		)
+	}
+	spinner.FinalMSG = "✔️\n"
+	return nil
+}
+
 // copyCmd represents the copy command
 var copyCmd = &cobra.Command{
 	Use:   "copy",
@@ -47,100 +147,16 @@ var copyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		config := config.NewConfig()
 		tmetricUser := tmetric.NewUser()
-		timeEntries, err := tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
+
+		filteredEntries, err := checkTmetricEntries(tmetricUser, config)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-
-		if len(tmetric.GetEntriesWithoutWorkType(timeEntries)) > 0 {
-			_, _ = fmt.Fprintln(
-				os.Stderr,
-				"Some time-entries do not have any work-type assigned, run the 'check tmetric' command to fix it",
-			)
-			os.Exit(1)
-		}
-
-		if len(tmetric.GetEntriesWithoutLinkToOpenProject(timeEntries)) > 0 {
-			_, _ = fmt.Fprintln(
-				os.Stderr,
-				"Some time-entries are not linked to an OpenProject work-package, run the 'check tmetric' command to fix it",
-			)
-			os.Exit(1)
-		}
-
-		filteredEntries := tmetric.GetEntriesNotTransferredToOpenProject(
-			timeEntries, config.TmetricTagTransferredToOpenProject,
-		)
-
 		for _, tmetricTimeEntry := range filteredEntries {
-			issueId, err := tmetricTimeEntry.GetIssueIdAsInt()
+			err = transferEntryToOpenProject(tmetricTimeEntry, tmetricUser, config)
 			if err != nil {
-				_, _ = fmt.Fprintln(
-					os.Stderr, err,
-				)
-				os.Exit(1)
-			}
-
-			workType, err := tmetricTimeEntry.GetWorkType()
-			if err != nil {
-				_, _ = fmt.Fprintf(
-					os.Stderr,
-					"Error with time entry '%v' in project '%v'\nError: %v\n",
-					tmetricTimeEntry.Note,
-					tmetricTimeEntry.Project.Name,
-					err,
-				)
-				os.Exit(1)
-			}
-
-			activity, err := openproject.NewActivityFromWorkType(*config, issueId, workType)
-			if err != nil {
-				_, _ = fmt.Fprintf(
-					os.Stderr,
-					"Error with time entry '%v' in project '%v'\nError: %v\n",
-					tmetricTimeEntry.Note,
-					tmetricTimeEntry.Project.Name,
-					err,
-				)
-				os.Exit(1)
-			}
-
-			openProjectTimeEntry, err := tmetricTimeEntry.ConvertToOpenProjectTimeEntry(activity)
-			if err != nil {
-				_, _ = fmt.Fprintf(
-					os.Stderr,
-					"could not convert time entry '%v' in project '%v' started at '%v' from tmetric to OpenProject\n"+
-						"Error: %v\n",
-					tmetricTimeEntry.Note, tmetricTimeEntry.Project, tmetricTimeEntry.StartTime, err,
-				)
-				os.Exit(1)
-			}
-
-			err = openProjectTimeEntry.Save(*config)
-			if err != nil {
-				_, _ = fmt.Fprintf(
-					os.Stderr,
-					"could not save time entry '%v' for work package '%v' spend on '%v' in OpenProject\n"+
-						"Error: %v\n",
-					openProjectTimeEntry.Comment.Raw,
-					filepath.Base(openProjectTimeEntry.Links.WorkPackage.Href),
-					openProjectTimeEntry.SpentOn,
-					err,
-				)
-				os.Exit(1)
-			}
-
-			tmetricTimeEntry.TagAsTransferredToOpenProject(*config)
-			tmetricUser = tmetric.NewUser()
-			err = tmetricTimeEntry.Update(*config, *tmetricUser)
-			if err != nil {
-				_, _ = fmt.Fprintf(
-					os.Stderr,
-					"could not tag tmetric entry as being transferred to openproject\n"+
-						"Error: %v\n",
-					err,
-				)
+				_, _ = fmt.Fprint(os.Stderr, err)
 				os.Exit(1)
 			}
 		}

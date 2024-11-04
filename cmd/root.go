@@ -19,7 +19,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/briandowns/spinner"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -79,4 +81,8 @@ func initConfig() {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 
 	}
+}
+
+func newSpinner() *spinner.Spinner {
+	return spinner.New(spinner.CharSets[7], 100*time.Millisecond)
 }
