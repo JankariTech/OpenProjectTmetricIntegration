@@ -24,13 +24,14 @@ import (
 )
 
 type Config struct {
-	OpenProjectUrl        string
-	OpenProjectToken      string
-	TmetricToken          string
-	ClientIdInTmetric     int
-	TmetricAPIBaseUrl     string
-	TmetricAPIV3BaseUrl   string
-	TmetricDummyProjectId int
+	OpenProjectUrl                     string
+	OpenProjectToken                   string
+	TmetricToken                       string
+	ClientIdInTmetric                  int
+	TmetricAPIBaseUrl                  string
+	TmetricAPIV3BaseUrl                string
+	TmetricDummyProjectId              int
+	TmetricTagTransferredToOpenProject string
 }
 
 func NewConfig() *Config {
@@ -60,12 +61,13 @@ func NewConfig() *Config {
 		os.Exit(1)
 	}
 	return &Config{
-		OpenProjectUrl:        openProjectUrl,
-		OpenProjectToken:      openProjectToken,
-		TmetricToken:          tmetricToken,
-		ClientIdInTmetric:     clientIdInTmetric,
-		TmetricAPIBaseUrl:     "https://app.tmetric.com/api/",
-		TmetricAPIV3BaseUrl:   "https://app.tmetric.com/api/v3/",
-		TmetricDummyProjectId: tmetricDummyProjectId,
+		OpenProjectUrl:                     openProjectUrl,
+		OpenProjectToken:                   openProjectToken,
+		TmetricToken:                       tmetricToken,
+		ClientIdInTmetric:                  clientIdInTmetric,
+		TmetricAPIBaseUrl:                  "https://app.tmetric.com/api/",
+		TmetricAPIV3BaseUrl:                "https://app.tmetric.com/api/v3/",
+		TmetricDummyProjectId:              tmetricDummyProjectId,
+		TmetricTagTransferredToOpenProject: "transferred-to-openproject",
 	}
 }

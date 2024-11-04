@@ -23,7 +23,9 @@ import (
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/go-resty/resty/v2"
+	"regexp"
 	"strconv"
+	"time"
 )
 
 type ExternalLink struct {
@@ -169,6 +171,14 @@ func (timeEntry *TimeEntry) GetPossibleWorkTypes(config config.Config, user User
 	return workTypes, nil
 }
 
+// GetIssueIdAsInt returns the issue id as an integer
+// the issue Id in tmetric is a string e.g. #1234, but for OpenProject we need the integer to construct the URLs
+func (timeEntry *TimeEntry) GetIssueIdAsInt() (int, error) {
+	issueIdStr := regexp.MustCompile(`#(\d+)`).
+		FindStringSubmatch(timeEntry.Task.ExternalLink.IssueId)[1]
+	return strconv.Atoi(issueIdStr)
+}
+
 /*
 this is the only way to create an external task in tmetric.
 This task is needed to have an issueId of OpenProject assigned to a time entry.
@@ -177,6 +187,9 @@ func CreateDummyTimeEntry(
 	workPackage openproject.WorkPackage, tmetricUser *User, config *config.Config,
 ) (*TimeEntry, error) {
 	dummyTimeEntry := NewDummyTimeEntry(workPackage, config.OpenProjectUrl, config.TmetricDummyProjectId)
+	// the serviceUrl for the dummy task has always to be "https://community.openproject.org"
+	// otherwise tmetric does not recognize the integration and does not allow to create the external task
+	dummyTimeEntry.ServiceUrl = "https://community.openproject.org"
 	dummyTimerString, _ := json.Marshal(dummyTimeEntry)
 	httpClient := resty.New()
 	resp, err := httpClient.R().
@@ -222,4 +235,62 @@ func CreateDummyTimeEntry(
 		)
 	}
 	return &latestTimeEntry, nil
+}
+
+func (timeEntry *TimeEntry) GetWorkType() (string, error) {
+	for _, tag := range timeEntry.Tags {
+		if tag.IsWorkType {
+			return tag.Name, nil
+		}
+	}
+	return "", fmt.Errorf("no work type found")
+}
+
+func (timeEntry *TimeEntry) ConvertToOpenProjectTimeEntry(activity openproject.Activity) (openproject.TimeEntry, error) {
+	opTimeEntry := openproject.TimeEntry{
+		Ongoing: false,
+	}
+	opTimeEntry.Comment.Raw = timeEntry.Note
+	issueId, err := timeEntry.GetIssueIdAsInt()
+	if err != nil {
+		return openproject.TimeEntry{}, err
+	}
+	opTimeEntry.Links.WorkPackage.Href = fmt.Sprintf("/api/v3/work_packages/%d", issueId)
+	opTimeEntry.Links.Activity.Href = fmt.Sprintf("/api/v3/time_entries/activities/%d", activity.Id)
+	iso8601Duration, spentOn, err := timeEntry.getIso8601Duration()
+	if err != nil {
+		return openproject.TimeEntry{}, err
+	}
+	opTimeEntry.Hours = iso8601Duration
+	opTimeEntry.SpentOn = spentOn
+	return opTimeEntry, err
+}
+
+func (timeEntry *TimeEntry) getIso8601Duration() (string, string, error) {
+	startTimeParsed, err := time.Parse("2006-01-02T15:04:05", timeEntry.StartTime)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse startTime: %v", err)
+	}
+	endTimeParsed, err := time.Parse("2006-01-02T15:04:05", timeEntry.EndTime)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse endTime: %v", err)
+	}
+	duration := endTimeParsed.Sub(startTimeParsed)
+	if duration < 0 {
+		return "", "", fmt.Errorf("end time is before start time")
+	}
+
+	iso8601Duration := fmt.Sprintf(
+		"P%dDT%dH%dM%dS",
+		int(duration.Hours()/24),
+		int(duration.Hours())%24,
+		int(duration.Minutes())%60,
+		int(duration.Seconds())%60,
+	)
+	spentOn := startTimeParsed.Format("2006-01-02")
+	return iso8601Duration, spentOn, nil
+}
+
+func (timeEntry *TimeEntry) TagAsTransferredToOpenProject(config config.Config) {
+	timeEntry.Tags = append(timeEntry.Tags, Tag{Name: config.TmetricTagTransferredToOpenProject})
 }

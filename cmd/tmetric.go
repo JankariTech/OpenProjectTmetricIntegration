@@ -115,7 +115,7 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser *tme
 }
 
 func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser *tmetric.User, config *config.Config) error {
-	entriesWithoutWorkType := tmetric.GetEntriesWithoutWorkType(timeEntries, config)
+	entriesWithoutWorkType := tmetric.GetEntriesWithoutWorkType(timeEntries)
 	if len(entriesWithoutWorkType) > 0 {
 		fmt.Println("Some time-entries do not have any work type assigned")
 	}
