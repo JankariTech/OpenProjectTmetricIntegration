@@ -10,13 +10,13 @@ type Activity struct {
 	Name string `json:"name"`
 }
 
-func NewFromWorkType(
+func NewActivityFromWorkType(
 	config config.Config, issueId int, workType string,
 ) (Activity, error) {
 	workPackage := WorkPackage{
 		Id: issueId,
 	}
-	activities, err := workPackage.GetAllowedActivities(config)
+	activities, err := workPackage.getAllowedActivities(config)
 	if err != nil {
 		return Activity{}, err
 	}
@@ -25,6 +25,7 @@ func NewFromWorkType(
 	for _, activity := range activities {
 		if workType == activity.Name {
 			workTypeValid = true
+			selectedActivity = activity
 			break
 		}
 	}

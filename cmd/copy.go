@@ -102,7 +102,7 @@ var copyCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			activity, err := openproject.NewFromWorkType(*config, issueId, workType)
+			activity, err := openproject.NewActivityFromWorkType(*config, issueId, workType)
 			if err != nil {
 				_, _ = fmt.Fprintf(
 					os.Stderr,

@@ -60,7 +60,7 @@ func GetWorkpackage(workPackageId string, config *config.Config) (WorkPackage, e
 	return workPackage, err
 }
 
-func (w *WorkPackage) GetAllowedActivities(config config.Config) ([]Activity, error) {
+func (w *WorkPackage) getAllowedActivities(config config.Config) ([]Activity, error) {
 	httpClient := resty.New()
 	openProjectUrl, _ := url.JoinPath(config.OpenProjectUrl, "/api/v3/time_entries/form")
 	body := fmt.Sprintf(`{"_links":{"workPackage":{"href":"/api/v3/work_packages/%d"}}}`, w.Id)
@@ -83,6 +83,11 @@ func (w *WorkPackage) GetAllowedActivities(config config.Config) ([]Activity, er
 
 	activitiesJSON := gjson.GetBytes(resp.Body(), "_embedded.schema.activity._embedded.allowedValues")
 	validationErrorJSON := gjson.GetBytes(resp.Body(), "_embedded.validationErrors.workPackage.message")
+	if validationErrorJSON.Exists() {
+		return []Activity{}, fmt.Errorf(
+			"work package '%v' not found. Error: %v", w.Id, validationErrorJSON.String(),
+		)
+	}
 	var activities []Activity
 	err = json.Unmarshal([]byte(activitiesJSON.String()), &activities)
 	if err != nil {
@@ -90,10 +95,6 @@ func (w *WorkPackage) GetAllowedActivities(config config.Config) ([]Activity, er
 			"error parsing work packages response or no work packages found: %v", err,
 		)
 	}
-	if validationErrorJSON.Exists() {
-		return []Activity{}, fmt.Errorf(
-			"work package '%v' not found. Error: %v", w.Id, validationErrorJSON.String(),
-		)
-	}
+
 	return activities, nil
 }
