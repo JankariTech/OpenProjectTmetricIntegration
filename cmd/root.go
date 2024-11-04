@@ -28,6 +28,8 @@ import (
 )
 
 var cfgFile string
+var startDate string
+var endDate string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{

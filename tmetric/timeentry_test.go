@@ -82,7 +82,7 @@ func Test_getIso8601Duration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ISO8601Period, spendOn, err := tt.timeEntry.getIso8601Duration()
+			ISO8601Period, spendOn, err := tt.timeEntry.GetIso8601Duration()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
 				return
