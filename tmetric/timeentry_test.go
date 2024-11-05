@@ -50,7 +50,7 @@ func Test_getIso8601Duration(t *testing.T) {
 			wantISO8601Period: "",
 			wantSpendOn:       "",
 			wantErr:           true,
-			wantErrMessage:    "failed to parse endTime: parsing time \"2023-02-29T10:31:00\": day out of range",
+			wantErrMessage:    "failed to parse time: parsing time \"2023-02-29T10:31:00\": day out of range",
 		},
 		{
 			name: "Invalid start time format",
@@ -59,7 +59,7 @@ func Test_getIso8601Duration(t *testing.T) {
 			wantISO8601Period: "",
 			wantSpendOn:       "",
 			wantErr:           true,
-			wantErrMessage:    "failed to parse startTime: parsing time \"invalid\" as \"2006-01-02T15:04:05\": cannot parse \"invalid\" as \"2006\"",
+			wantErrMessage:    "failed to parse time: parsing time \"invalid\" as \"2006-01-02T15:04:05\": cannot parse \"invalid\" as \"2006\"",
 		},
 		{
 			name: "Invalid end time format",
@@ -68,7 +68,7 @@ func Test_getIso8601Duration(t *testing.T) {
 			wantISO8601Period: "",
 			wantSpendOn:       "",
 			wantErr:           true,
-			wantErrMessage:    "failed to parse endTime: parsing time \"invalid\" as \"2006-01-02T15:04:05\": cannot parse \"invalid\" as \"2006\"",
+			wantErrMessage:    "failed to parse time: parsing time \"invalid\" as \"2006-01-02T15:04:05\": cannot parse \"invalid\" as \"2006\"",
 		},
 		{
 			name: "End time before start time",
