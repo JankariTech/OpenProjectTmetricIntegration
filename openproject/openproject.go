@@ -36,8 +36,8 @@ func GetAllTimeEntries(config *config.Config, startDate string, endDate string) 
 		SetQueryParam("pageSize", "3000").
 		SetQueryParam("sortBy", "[[\"updated_at\",\"desc\"]]").
 		// the operator is '<>d' and means between the dates
-		SetBody(fmt.Sprintf(
-			`[{"user_id":{"operator":"\u003d","values":["me"]}},{"spent_on":{"operator":"\u003c\u003ed","values":["%v","%v"]}}]`,
+		SetQueryParam("filters", fmt.Sprintf(
+			`[{"user":{"operator":"\u003d","values":["me"]}},{"spent_on":{"operator":"\u003c\u003ed","values":["%v","%v"]}}]`,
 			startDate,
 			endDate),
 		).
