@@ -301,7 +301,9 @@ func (timeEntry *TimeEntry) GetDuration() (time.Duration, error) {
 
 func (timeEntry *TimeEntry) GetIso8601Duration() (string, string, error) {
 	duration, err := timeEntry.GetDuration()
-
+	if err != nil {
+		return "", "", err
+	}
 	iso8601Duration := fmt.Sprintf(
 		"P%dDT%dH%dM%dS",
 		int(duration.Hours()/24),
