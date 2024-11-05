@@ -95,7 +95,8 @@ var diffCmd = &cobra.Command{
 			for _, entry := range tmetricTimeEntries {
 				entryDate, _ := time.Parse("2006-01-02", entry.StartTime[:10])
 				if entryDate.Equal(currentDay) {
-					row.TmetricEntry += fmt.Sprintf("%v => %v\n", entry.Project.Name, entry.Note)
+					workType, _ := entry.GetWorkType()
+					row.TmetricEntry += fmt.Sprintf("%v => %v [%v]\n", entry.Project.Name, entry.Note, workType)
 					duration, _ := entry.GetDuration()
 					sumDurationTmetric += int(duration.Minutes())
 					humanReadableDuration, _ := entry.GetHumanReadableDuration()
@@ -108,10 +109,11 @@ var diffCmd = &cobra.Command{
 				entryDate, _ := time.Parse("2006-01-02", entry.SpentOn)
 				if entryDate.Equal(currentDay) {
 					row.OpenProjectEntry += fmt.Sprintf(
-						"%v (#%v) => %v\n",
+						"%v (#%v) => %v [%v]\n",
 						entry.Links.WorkPackage.Title,
 						path.Base(entry.Links.WorkPackage.Href),
 						entry.Comment.Raw,
+						entry.Links.Activity.Title,
 					)
 					duration, _ := entry.GetDuration()
 					sumDurationOpenProject += int(duration.Minutes())
