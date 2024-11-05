@@ -23,7 +23,9 @@ import (
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"os"
 	"path"
 	"sort"
@@ -39,6 +41,21 @@ type tableRow struct {
 	OpenProjectEntry    string
 	OpenProjectDuration string
 	DiffInTime          string
+}
+
+var widthOfFixedColumns = 45 // rough size of all columns that have a fixed width
+
+// tries to find out the width of the terminal and returns 80 if it fails
+func getTerminalWidth() int {
+	if term.IsTerminal(0) {
+		terminalWidth, _, err := term.GetSize(0)
+		if err != nil {
+			return 80
+		}
+		return terminalWidth
+	} else {
+		return 80
+	}
 }
 
 // diffCmd represents the diff command
@@ -87,6 +104,11 @@ var diffCmd = &cobra.Command{
 		outputTable.AppendHeader(
 			table.Row{"date", "tmetric entry", "tm\ndur", "OpenProject entry", "OP\ndur", "time\ndiff"},
 		)
+		widthContentColumns := int((getTerminalWidth() - widthOfFixedColumns) / 2)
+		outputTable.SetColumnConfigs([]table.ColumnConfig{
+			{Number: 2, WidthMax: widthContentColumns},
+			{Number: 4, WidthMax: widthContentColumns},
+		})
 
 		for currentDay := start; !currentDay.After(end); currentDay = currentDay.AddDate(0, 0, 1) {
 			row := tableRow{}
@@ -96,29 +118,47 @@ var diffCmd = &cobra.Command{
 				entryDate, _ := time.Parse("2006-01-02", entry.StartTime[:10])
 				if entryDate.Equal(currentDay) {
 					workType, _ := entry.GetWorkType()
-					row.TmetricEntry += fmt.Sprintf("%v => %v [%v]\n", entry.Project.Name, entry.Note, workType)
+					description := fmt.Sprintf("Description: %v", entry.Note)
+					project := fmt.Sprintf("- Project: %v", entry.Project.Name)
+					wpId := fmt.Sprintf("- WP ID: %v", entry.Task.ExternalLink.IssueId)
+					wp := fmt.Sprintf("- WP: %v", entry.Task.Name)
+					workType = fmt.Sprintf("- Work Type: %v", workType)
+					row.TmetricEntry += fmt.Sprintf(
+						"%v\n%v\n%v\n%v\n%v\n\n",
+						text.Snip(description, widthContentColumns, "~"),
+						text.Snip(project, widthContentColumns, "~"),
+						text.Snip(wpId, widthContentColumns, "~"),
+						text.Snip(wp, widthContentColumns, "~"),
+						text.Snip(workType, widthContentColumns, "~"),
+					)
 					duration, _ := entry.GetDuration()
 					sumDurationTmetric += int(duration.Minutes())
 					humanReadableDuration, _ := entry.GetHumanReadableDuration()
 
-					row.TmetricDuration += fmt.Sprintf("%v\n", humanReadableDuration)
+					row.TmetricDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
 				}
 			}
 			sumDurationOpenProject := 0
 			for _, entry := range openProjectTimeEntries {
 				entryDate, _ := time.Parse("2006-01-02", entry.SpentOn)
 				if entryDate.Equal(currentDay) {
+					comment := fmt.Sprintf("Comment: %v", entry.Comment.Raw)
+					project := fmt.Sprintf("- Project: %v", entry.Links.Project.Title)
+					wpId := fmt.Sprintf("- WP ID: #%v", path.Base(entry.Links.WorkPackage.Href))
+					wp := fmt.Sprintf("- WP: %v", entry.Links.WorkPackage.Title)
+					activity := fmt.Sprintf("- Activity: %v", entry.Links.Activity.Title)
 					row.OpenProjectEntry += fmt.Sprintf(
-						"%v (#%v) => %v [%v]\n",
-						entry.Links.WorkPackage.Title,
-						path.Base(entry.Links.WorkPackage.Href),
-						entry.Comment.Raw,
-						entry.Links.Activity.Title,
+						"%v\n%v\n%v\n%v\n%v\n\n",
+						text.Snip(comment, widthContentColumns, "~"),
+						text.Snip(project, widthContentColumns, "~"),
+						text.Snip(wpId, widthContentColumns, "~"),
+						text.Snip(wp, widthContentColumns, "~"),
+						text.Snip(activity, widthContentColumns, "~"),
 					)
 					duration, _ := entry.GetDuration()
 					sumDurationOpenProject += int(duration.Minutes())
 					humanReadableDuration, _ := entry.GetHumanReadableDuration()
-					row.OpenProjectDuration += fmt.Sprintf("%v\n", humanReadableDuration)
+					row.OpenProjectDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
 				}
 			}
 			if sumDurationTmetric > sumDurationOpenProject {
