@@ -23,8 +23,13 @@ type TimeEntry struct {
 			Title string `json:"title"`
 		} `json:"workPackage"`
 		Activity struct {
-			Href string `json:"href"`
+			Href  string `json:"href"`
+			Title string `json:"title"`
 		} `json:"activity"`
+		Project struct {
+			Href  string `json:"href"`
+			Title string `json:"title"`
+		} `json:"project"`
 	} `json:"_links"`
 }
 
