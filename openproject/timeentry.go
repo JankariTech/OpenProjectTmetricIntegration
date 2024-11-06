@@ -27,9 +27,9 @@ type TimeEntry struct {
 			Title string `json:"title"`
 		} `json:"activity"`
 		Project struct {
-			Href  string `json:"href"`
-			Title string `json:"title"`
-		} `json:"project"`
+			Href  string `json:"href,omitempty"`
+			Title string `json:"title,omitempty"`
+		} `json:"project,omitempty"`
 	} `json:"_links"`
 }
 
