@@ -184,7 +184,7 @@ this is the only way to create an external task in tmetric.
 This task is needed to have an issueId of OpenProject assigned to a time entry.
 */
 func CreateDummyTimeEntry(
-	workPackage openproject.WorkPackage, tmetricUser *User, config *config.Config,
+	workPackage openproject.WorkPackage, tmetricUser User, config *config.Config,
 ) (*TimeEntry, error) {
 	dummyTimeEntry := NewDummyTimeEntry(workPackage, config.OpenProjectUrl, config.TmetricDummyProjectId)
 	// the serviceUrl for the dummy task has always to be "https://community.openproject.org"

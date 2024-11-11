@@ -7,7 +7,7 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-func GetAllTimeEntries(config *config.Config, tmetricUser *User, startDate string, endDate string) ([]TimeEntry, error) {
+func GetAllTimeEntries(config *config.Config, tmetricUser User, startDate string, endDate string) ([]TimeEntry, error) {
 	httpClient := resty.New()
 	resp, err := httpClient.R().
 		SetAuthToken(config.TmetricToken).

@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-func checkTmetricEntries(tmetricUser *tmetric.User, config *config.Config) ([]tmetric.TimeEntry, error) {
+func checkTmetricEntries(tmetricUser tmetric.User, config *config.Config) ([]tmetric.TimeEntry, error) {
 	spinner := newSpinner()
 	defer spinner.Stop()
 	spinner.Prefix = "Checking time entries in Tmetric... "
@@ -59,7 +59,7 @@ func checkTmetricEntries(tmetricUser *tmetric.User, config *config.Config) ([]tm
 }
 
 func transferEntryToOpenProject(
-	tmetricTimeEntry tmetric.TimeEntry, tmetricUser *tmetric.User, config *config.Config,
+	tmetricTimeEntry tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config,
 ) error {
 	spinner := newSpinner()
 	defer spinner.Stop()
@@ -116,7 +116,7 @@ func transferEntryToOpenProject(
 
 	tmetricTimeEntry.TagAsTransferredToOpenProject(*config)
 	tmetricUser = tmetric.NewUser()
-	err = tmetricTimeEntry.Update(*config, *tmetricUser)
+	err = tmetricTimeEntry.Update(*config, tmetricUser)
 	if err != nil {
 		return fmt.Errorf(
 			"could not tag tmetric entry as being transferred to openproject\n"+
