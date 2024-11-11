@@ -41,7 +41,7 @@ func validateOpenProjectWorkPackage(input string) error {
 	return nil
 }
 
-func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser *tmetric.User, config *config.Config) error {
+func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
 	// get all entries that belong to the client and do not have an external link
 	var entriesWithoutIssue []tmetric.TimeEntry
 	for _, entry := range timeEntries {
@@ -105,9 +105,9 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser *tme
 				if err != nil {
 					return err
 				}
-				_ = latestTimeEntry.Delete(*config, *tmetricUser)
+				_ = latestTimeEntry.Delete(*config, tmetricUser)
 				entry.Task = latestTimeEntry.Task
-				err = entry.Update(*config, *tmetricUser)
+				err = entry.Update(*config, tmetricUser)
 				if err != nil {
 					return err
 				}
@@ -119,7 +119,7 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser *tme
 	return nil
 }
 
-func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser *tmetric.User, config *config.Config) error {
+func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
 	entriesWithoutWorkType := tmetric.GetEntriesWithoutWorkType(timeEntries)
 	if len(entriesWithoutWorkType) > 0 {
 		fmt.Println("Some time-entries do not have any work type assigned")
@@ -128,7 +128,7 @@ func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser *
 	spinner := newSpinner()
 	defer spinner.Stop()
 	for _, entry := range entriesWithoutWorkType {
-		possibleWorkTypes, err := entry.GetPossibleWorkTypes(*config, *tmetricUser)
+		possibleWorkTypes, err := entry.GetPossibleWorkTypes(*config, tmetricUser)
 
 		if err != nil {
 			return err
@@ -172,7 +172,7 @@ func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser *
 			spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
 			spinner.FinalMSG = "❌\n"
 
-			err = entry.Update(*config, *tmetricUser)
+			err = entry.Update(*config, tmetricUser)
 			if err != nil {
 				return err
 			}

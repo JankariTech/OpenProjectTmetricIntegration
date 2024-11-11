@@ -31,7 +31,7 @@ type User struct {
 	ActiveAccountId int    `json:"activeAccountId"`
 }
 
-func NewUser() *User {
+func NewUser() User {
 	config := config.NewConfig()
 
 	httpClient := resty.New()
@@ -55,5 +55,5 @@ func NewUser() *User {
 		os.Exit(1)
 	}
 
-	return &user
+	return user
 }
