@@ -30,6 +30,10 @@ type TimeEntry struct {
 			Href  string `json:"href,omitempty"`
 			Title string `json:"title,omitempty"`
 		} `json:"project,omitempty"`
+		User struct {
+			Href  string `json:"href,omitempty"`
+			Title string `json:"title,omitempty"`
+		} `json:"user,omitempty"`
 	} `json:"_links"`
 }
 

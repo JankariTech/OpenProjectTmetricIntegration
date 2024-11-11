@@ -44,6 +44,7 @@ type tableRow struct {
 }
 
 var widthOfFixedColumns = 45 // rough size of all columns that have a fixed width
+var userNameFromCmd string
 
 // tries to find out the width of the terminal and returns 80 if it fails
 func getTerminalWidth() int {
@@ -77,7 +78,19 @@ var diffCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		config := config.NewConfig()
 
-		tmetricUser := tmetric.NewUser()
+		tmetricUserMe := tmetric.NewUser()
+		var tmetricUser tmetric.User
+		if userNameFromCmd == "" {
+			tmetricUser = tmetricUserMe
+		} else {
+			var err error
+			tmetricUser, err = tmetric.FindUserByName(config, tmetricUserMe, userNameFromCmd)
+			if err != nil {
+				_, _ = fmt.Fprint(os.Stderr, err)
+				os.Exit(1)
+			}
+		}
+
 		tmetricTimeEntries, err := tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
@@ -87,7 +100,17 @@ var diffCmd = &cobra.Command{
 			return tmetricTimeEntries[i].Note < tmetricTimeEntries[j].Note
 		})
 
-		openProjectTimeEntries, err := openproject.GetAllTimeEntries(config, startDate, endDate)
+		var openProjectUser openproject.User
+		if userNameFromCmd != "" {
+			var err error
+			openProjectUser, err = openproject.FindUserByName(config, userNameFromCmd)
+			if err != nil {
+				_, _ = fmt.Fprint(os.Stderr, err)
+				os.Exit(1)
+			}
+		}
+
+		openProjectTimeEntries, err := openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
@@ -190,4 +213,7 @@ func init() {
 	diffCmd.Flags().StringVarP(&startDate, "start", "s", firstDayOfMonth, "start date")
 	today := time.Now().Format("2006-01-02")
 	diffCmd.Flags().StringVarP(&endDate, "end", "e", today, "end date")
+	diffCmd.Flags().StringVarP(
+		&userNameFromCmd, "user", "u", "", "name of the user that should be checked",
+	)
 }
