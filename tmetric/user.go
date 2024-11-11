@@ -77,6 +77,7 @@ func NewUser() User {
 	return user
 }
 
+// FindUserByName searches for users that match the given search and returns the first match.
 func FindUserByName(config *config.Config, userMe User, search string) (User, error) {
 	httpClient := resty.New()
 
