@@ -24,12 +24,20 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/tidwall/gjson"
 	"net/url"
+	"strconv"
 )
 
-func GetAllTimeEntries(config *config.Config, startDate string, endDate string) ([]TimeEntry, error) {
+func GetAllTimeEntries(config *config.Config, user User, startDate string, endDate string) ([]TimeEntry, error) {
 	httpClient := resty.New()
 	openProjectUrl, _ := url.JoinPath(config.OpenProjectUrl, "/api/v3/time_entries")
+	var userString string
 
+	// use ether "me" in the request or the id of the user
+	if user == (User{}) {
+		userString = "me"
+	} else {
+		userString = strconv.Itoa(user.Id)
+	}
 	resp, err := httpClient.R().
 		SetBasicAuth("apikey", config.OpenProjectToken).
 		SetHeader("Content-Type", "application/json").
@@ -37,14 +45,18 @@ func GetAllTimeEntries(config *config.Config, startDate string, endDate string) 
 		SetQueryParam("sortBy", "[[\"updated_at\",\"desc\"]]").
 		// the operator is '<>d' and means between the dates
 		SetQueryParam("filters", fmt.Sprintf(
-			`[{"user":{"operator":"\u003d","values":["me"]}},{"spent_on":{"operator":"\u003c\u003ed","values":["%v","%v"]}}]`,
+			`[{"user":{"operator":"=","values":["%v"]}},{"spent_on":{"operator":"\u003c\u003ed","values":["%v","%v"]}}]`,
+			userString,
 			startDate,
 			endDate),
 		).
 		Get(openProjectUrl)
 	if err != nil || resp.StatusCode() != 200 {
 		return nil, fmt.Errorf(
-			"cannot read timeentries from OpenProject. Error: '%v'. HTTP status code: %v", err, resp.StatusCode(),
+			"cannot read timeentries from OpenProject for user '%v'. Error: '%v'. HTTP status code: %v",
+			user.Name,
+			err,
+			resp.StatusCode(),
 		)
 	}
 	var timeEntries []TimeEntry
