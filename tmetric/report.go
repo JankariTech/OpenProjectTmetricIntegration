@@ -13,6 +13,7 @@ import (
 type ReportItem struct {
 	StartTime string `json:"startTime"`
 	EndTime   string `json:"endTime"`
+	User      string `json:"user"`
 }
 
 type Report struct {
@@ -53,25 +54,24 @@ func (reportItem *ReportItem) getDuration() (time.Duration, error) {
 	return duration, nil
 }
 
-func GetDetailedReport(clientName string, tagName string, groupName string, startDate string, endDate string) (Report, error) {
-	conf := config.NewConfig()
-	tmetricUser := NewUser()
-
-	client, err := getClientByName(conf, tmetricUser, clientName)
+func GetDetailedReport(
+	config *config.Config, tmetricUser User, clientName string, tagName string, groupName string, startDate string, endDate string,
+) (Report, error) {
+	client, err := getClientByName(config, tmetricUser, clientName)
 	if err != nil {
 		return Report{}, err
 	}
 
-	team, err := getTeamByName(conf, tmetricUser, groupName)
+	team, err := getTeamByName(config, tmetricUser, groupName)
 	if err != nil {
 		return Report{}, err
 	}
 	httpClient := resty.New()
-	tmetricUrl, _ := url.JoinPath(conf.TmetricAPIBaseUrl, "reports/detailed")
+	tmetricUrl, _ := url.JoinPath(config.TmetricAPIBaseUrl, "reports/detailed")
 	request := httpClient.R()
 
 	if tagName != "" {
-		workType, err := getWorkTypeByName(conf, tmetricUser, tagName)
+		workType, err := getWorkTypeByName(config, tmetricUser, tagName)
 		if err != nil {
 			return Report{}, err
 		}
@@ -83,7 +83,7 @@ func GetDetailedReport(clientName string, tagName string, groupName string, star
 	endDate = endTime.AddDate(0, 0, 1).Format("2006-01-02")
 
 	resp, err := request.
-		SetAuthToken(conf.TmetricToken).
+		SetAuthToken(config.TmetricToken).
 		SetQueryParam("AccountId", strconv.Itoa(tmetricUser.ActiveAccountId)).
 		SetQueryParam("ClientList", strconv.Itoa(client.Id)).
 		SetQueryParam("GroupList", strconv.Itoa(team.Id)).

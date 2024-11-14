@@ -6,14 +6,18 @@ package cmd
 import (
 	"fmt"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
+	"github.com/Masterminds/sprig/v3"
 	"github.com/spf13/cobra"
-	"math"
 	"os"
 	"strings"
 	"text/template"
 	"time"
 )
+
+var billNumber string
+var tmplFile string
 
 // billCmd represents the bill command
 var billCmd = &cobra.Command{
@@ -33,17 +37,14 @@ var billCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		config := config.NewConfig()
-		//
 		tmetricUser := tmetric.NewUser()
-		tmetricTimeEntries, err := tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
-		if err != nil {
-			_, _ = fmt.Fprint(os.Stderr, err)
-			os.Exit(1)
-		}
 
 		funcMap := template.FuncMap{
+			"BillNumber": func() string {
+				return billNumber
+			},
 			"DetailedReport": func(clientName string, tagName string, groupName string) tmetric.Report {
-				report, _ := tmetric.GetDetailedReport(clientName, tagName, groupName, startDate, endDate)
+				report, _ := tmetric.GetDetailedReport(config, tmetricUser, clientName, tagName, groupName, startDate, endDate)
 				return report
 			},
 			"AllWorkTypes": func() []tmetric.Tag {
@@ -54,40 +55,43 @@ var billCmd = &cobra.Command{
 				teams, _ := tmetric.GetAllTeams(config, tmetricUser)
 				return teams
 			},
-			"Increment": func(i int) int {
-				return i + 1
-			},
-			"Round": func(f float64) float64 {
-				return math.Round(f*100) / 100
-			},
-			"FormatFloat": func(f float64) string {
+			"formatFloat": func(f float64) string {
 				s := fmt.Sprintf("%.2f", f)
 				return strings.Replace(s, ".", ",", -1)
-			},
-			"Add": func(a float64, b float64) float64 {
-				return a + b
-			},
-			"Multiply": func(a float64, b float64) float64 {
-				return a * b
 			},
 			"ServiceDate": func() string {
 				startTime, _ := time.Parse("2006-01-02", startDate)
 				return startTime.Format("01/2006")
 			},
+			"AllTimeEntries": func(user string) []openproject.TimeEntry {
+				var openProjectUser openproject.User
+				openProjectUser, err := openproject.FindUserByName(config, user)
+				if err != nil {
+					_, _ = fmt.Fprint(os.Stderr, err)
+					os.Exit(1)
+				}
+				openProjectTimeEntries, err := openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate)
+				if err != nil {
+					_, _ = fmt.Fprint(os.Stderr, err)
+					os.Exit(1)
+				}
+				return openProjectTimeEntries
+			},
 		}
+		// add all the functions from sprig
+		for i, f := range sprig.FuncMap() {
+			funcMap[i] = f
+		}
+
+		tmpl, err := template.New("bill").Funcs(funcMap).ParseFiles(tmplFile)
 		if err != nil {
-			_, _ = fmt.Fprint(os.Stderr, err)
+			_, _ = fmt.Fprint(os.Stderr, fmt.Errorf("could not parse template file '%v': %v", tmplFile, err))
 			os.Exit(1)
 		}
-		var tmplFile = "openproject.tmpl"
-
-		tmpl, err := template.New(tmplFile).Funcs(funcMap).ParseFiles(tmplFile)
+		err = tmpl.Execute(os.Stdout, nil)
 		if err != nil {
-			panic(err)
-		}
-		err = tmpl.Execute(os.Stdout, tmetricTimeEntries)
-		if err != nil {
-			panic(err)
+			_, _ = fmt.Fprint(os.Stderr, fmt.Errorf("could not execute template: %v", err))
+			os.Exit(1)
 		}
 	},
 }
@@ -101,4 +105,8 @@ func init() {
 	billCmd.Flags().StringVarP(&startDate, "start", "s", firstDayOfMonth, "start date")
 	today := time.Now().Format("2006-01-02")
 	billCmd.Flags().StringVarP(&endDate, "end", "e", today, "end date")
+	billCmd.Flags().StringVarP(&billNumber, "billNumber", "b", today, "the bill number")
+	billCmd.MarkFlagRequired("billNumber")
+	billCmd.Flags().StringVarP(&tmplFile, "template", "t", today, "the template file")
+	billCmd.MarkFlagRequired("template")
 }
