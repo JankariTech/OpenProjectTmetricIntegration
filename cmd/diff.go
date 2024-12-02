@@ -28,7 +28,6 @@ import (
 	"golang.org/x/term"
 	"os"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -96,9 +95,6 @@ var diffCmd = &cobra.Command{
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-		sort.Slice(tmetricTimeEntries, func(i, j int) bool {
-			return tmetricTimeEntries[i].Note < tmetricTimeEntries[j].Note
-		})
 
 		var openProjectUser openproject.User
 		if userNameFromCmd != "" {
@@ -115,9 +111,6 @@ var diffCmd = &cobra.Command{
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-		sort.Slice(openProjectTimeEntries, func(i, j int) bool {
-			return openProjectTimeEntries[i].Comment.Raw < openProjectTimeEntries[j].Comment.Raw
-		})
 
 		start, _ := time.Parse("2006-01-02", startDate)
 		end, _ := time.Parse("2006-01-02", endDate)

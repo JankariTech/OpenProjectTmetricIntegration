@@ -42,7 +42,7 @@ func GetAllTimeEntries(config *config.Config, user User, startDate string, endDa
 		SetBasicAuth("apikey", config.OpenProjectToken).
 		SetHeader("Content-Type", "application/json").
 		SetQueryParam("pageSize", "3000").
-		SetQueryParam("sortBy", "[[\"updated_at\",\"desc\"]]").
+		SetQueryParam("sortBy", "[[\"updated_at\",\"asc\"]]").
 		// the operator is '<>d' and means between the dates
 		SetQueryParam("filters", fmt.Sprintf(
 			`[{"user":{"operator":"=","values":["%v"]}},{"spent_on":{"operator":"\u003c\u003ed","values":["%v","%v"]}}]`,

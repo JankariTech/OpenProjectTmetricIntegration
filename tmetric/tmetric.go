@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/go-resty/resty/v2"
+	"sort"
 )
 
 func GetAllTimeEntries(config *config.Config, tmetricUser User, startDate string, endDate string) ([]TimeEntry, error) {
@@ -39,6 +40,10 @@ func GetAllTimeEntries(config *config.Config, tmetricUser User, startDate string
 			timeEntriesOfTheSelectedClient = append(timeEntriesOfTheSelectedClient, entry)
 		}
 	}
+	sort.Slice(timeEntriesOfTheSelectedClient, func(i, j int) bool {
+		return timeEntriesOfTheSelectedClient[i].StartTime < timeEntriesOfTheSelectedClient[j].StartTime
+	})
+
 	return timeEntriesOfTheSelectedClient, nil
 }
 
