@@ -11,6 +11,7 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/spf13/cobra"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
@@ -63,7 +64,7 @@ var billCmd = &cobra.Command{
 				startTime, _ := time.Parse("2006-01-02", startDate)
 				return startTime.Format("01/2006")
 			},
-			"AllTimeEntries": func(user string) []openproject.TimeEntry {
+			"AllTimeEntriesFromOpenProject": func(user string) []openproject.TimeEntry {
 				var openProjectUser openproject.User
 				openProjectUser, err := openproject.FindUserByName(config, user)
 				if err != nil {
@@ -83,7 +84,7 @@ var billCmd = &cobra.Command{
 			funcMap[i] = f
 		}
 
-		tmpl, err := template.New("bill").Funcs(funcMap).ParseFiles(tmplFile)
+		tmpl, err := template.New(filepath.Base(tmplFile)).Funcs(funcMap).ParseFiles(tmplFile)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, fmt.Errorf("could not parse template file '%v': %v", tmplFile, err))
 			os.Exit(1)
