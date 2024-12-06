@@ -69,9 +69,13 @@ var exportCmd = &cobra.Command{
 				teams, _ := tmetric.GetAllTeams(config, tmetricUser)
 				return teams
 			},
-			"formatFloat": func(f float64) string {
+			"formatFloat": func(f float64, optionalParameters ...string) string {
+				decimalSeparator := "."
+				if len(optionalParameters) > 0 {
+					decimalSeparator = optionalParameters[0]
+				}
 				s := fmt.Sprintf("%.2f", f)
-				return strings.Replace(s, ".", ",", -1)
+				return strings.Replace(s, ".", decimalSeparator, -1)
 			},
 			"ServiceDate": func() string {
 				startTime, _ := time.Parse("2006-01-02", startDate)

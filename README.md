@@ -70,7 +70,22 @@ This will show you a table with the time entries in both systems and if there is
 2. If some data is in OpenProject but not in tmetric, delete or edit it in OpenProject. To do so use the [cost-report feature](https://www.openproject.org/docs/user-guide/time-and-costs/reporting/).
 3. If you want to sync data again from tmetric to OpenProject, remove the `transferred-to-openproject` tag from the time entries in tmetric. **This will create new entries in OpenProject and by that might lead to duplication.**
 
+#### export data
+Data can be exported using the [Go template system](https://pkg.go.dev/text/template). This is useful e.g. to generate an invoice.
+First create a template file and then run:
+    
+```bash
+go run main.go export --template template.tmpl
+```
+
+- **DetailedReport** with parameters: `clientName string, tagName string, groupName string`. Gets a detailed report from t-metric and returns a `tmetric.Report` object.
+- **AllWorkTypes**. Gets all possible work types from t-metric and returns an array of `tmetric.Tag`
+- **AllTeams**. Gets all teams from t-metric and returns an array of `tmetric.Team`
+- **ServiceDate**. Returns the month of the `--start` date for the export in the format `01/2006`
+- **AllTimeEntriesFromOpenProject** with parameter `user string`. Gets all time entries for that user from OpenProject and returns an array of `openproject.TimeEntry`
+- **ArbitraryString** with parameter `i int`. Gets the data of the `arbitraryString` command line flag. Useful e.g. to add an invoice number.
+- **formatFloat** with parameters `f float64, decimalSeparator string (optional)`. Formats the float value to `%.2f` with that given separator.
+- all functions from [spring](https://masterminds.github.io/sprig/)
+
 #### work for a specific time period
-
 By default, the script will work with the current calendar month, but the start and end date can be configured with the `--start` and `--end` flags. The date format is `YYYY-MM-DD`.
-
