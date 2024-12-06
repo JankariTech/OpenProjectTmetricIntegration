@@ -31,13 +31,12 @@ import (
 	"time"
 )
 
-var billNumber string
+var arbitraryString []string
 var tmplFile string
 
-// billCmd represents the bill command
-var billCmd = &cobra.Command{
-	Use:   "bill",
-	Short: "A brief description of your command",
+var exportCmd = &cobra.Command{
+	Use:   "export",
+	Short: "export data using a template e.g. to generate an invoice",
 	Long:  ``,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		_, err := time.Parse("2006-01-02", startDate)
@@ -55,8 +54,8 @@ var billCmd = &cobra.Command{
 		tmetricUser := tmetric.NewUser()
 
 		funcMap := template.FuncMap{
-			"BillNumber": func() string {
-				return billNumber
+			"ArbitraryString": func(i int) string {
+				return arbitraryString[i]
 			},
 			"DetailedReport": func(clientName string, tagName string, groupName string) tmetric.Report {
 				report, _ := tmetric.GetDetailedReport(config, tmetricUser, clientName, tagName, groupName, startDate, endDate)
@@ -112,16 +111,22 @@ var billCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(billCmd)
+	rootCmd.AddCommand(exportCmd)
 
 	firstDayOfMonth := time.Now().Format("2006-01-02")
 	firstDayOfMonth = time.Now().AddDate(0, 0, -time.Now().Day()+1).Format("2006-01-02")
 
-	billCmd.Flags().StringVarP(&startDate, "start", "s", firstDayOfMonth, "start date")
+	exportCmd.Flags().StringVarP(&startDate, "start", "s", firstDayOfMonth, "start date")
 	today := time.Now().Format("2006-01-02")
-	billCmd.Flags().StringVarP(&endDate, "end", "e", today, "end date")
-	billCmd.Flags().StringVarP(&billNumber, "billNumber", "b", today, "the bill number")
-	billCmd.MarkFlagRequired("billNumber")
-	billCmd.Flags().StringVarP(&tmplFile, "template", "t", today, "the template file")
-	billCmd.MarkFlagRequired("template")
+	exportCmd.Flags().StringVarP(&endDate, "end", "e", today, "end date")
+	exportCmd.Flags().StringArrayVarP(
+		&arbitraryString,
+		"arbitraryString",
+		"a",
+		nil,
+		"any string that should be placed on the export, e.g. the invoice number",
+	)
+	exportCmd.MarkFlagRequired("arbitraryString")
+	exportCmd.Flags().StringVarP(&tmplFile, "template", "t", today, "the template file")
+	exportCmd.MarkFlagRequired("template")
 }
