@@ -6,6 +6,7 @@ import (
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/go-resty/resty/v2"
 	"sort"
+	"strings"
 )
 
 func GetAllTimeEntries(config *config.Config, tmetricUser User, startDate string, endDate string) ([]TimeEntry, error) {
@@ -83,10 +84,14 @@ func GetEntriesWithoutWorkType(timeEntries []TimeEntry) []TimeEntry {
 	return entriesWithoutWorkType
 }
 
-func GetEntriesWithoutLinkToOpenProject(timeEntries []TimeEntry) []TimeEntry {
+func GetEntriesWithoutLinkToOpenProject(config *config.Config, timeEntries []TimeEntry) []TimeEntry {
 	var entriesWithoutLink []TimeEntry
 	for _, entry := range timeEntries {
-		if entry.Task.Id == 0 {
+		_, err := entry.GetIssueIdAsInt()
+		if entry.Task.Id == 0 ||
+			err != nil ||
+			entry.Task.ExternalLink.IssueId == "" ||
+			(!strings.HasPrefix(entry.Task.ExternalLink.Link, config.TmetricExternalTaskLink+"work_packages")) {
 			entriesWithoutLink = append(entriesWithoutLink, entry)
 		}
 	}
