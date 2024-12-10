@@ -174,9 +174,18 @@ func (timeEntry *TimeEntry) GetPossibleWorkTypes(config config.Config, user User
 // GetIssueIdAsInt returns the issue id as an integer
 // the issue Id in tmetric is a string e.g. #1234, but for OpenProject we need the integer to construct the URLs
 func (timeEntry *TimeEntry) GetIssueIdAsInt() (int, error) {
-	issueIdStr := regexp.MustCompile(`#(\d+)`).
-		FindStringSubmatch(timeEntry.Task.ExternalLink.IssueId)[1]
-	return strconv.Atoi(issueIdStr)
+	issueRegex, err := regexp.Compile(`#(\d+)`)
+	if err != nil {
+		return 0, err
+	}
+	issueIdStr := issueRegex.FindStringSubmatch(timeEntry.Task.ExternalLink.IssueId)
+	if len(issueIdStr) != 2 {
+		return 0, fmt.Errorf(
+			"could not find valid OpenProject workpackage id in tmetric task '%v'",
+			timeEntry.Task.ExternalLink.IssueId,
+		)
+	}
+	return strconv.Atoi(issueIdStr[1])
 }
 
 /*
@@ -187,9 +196,7 @@ func CreateDummyTimeEntry(
 	workPackage openproject.WorkPackage, tmetricUser User, config *config.Config,
 ) (*TimeEntry, error) {
 	dummyTimeEntry := NewDummyTimeEntry(workPackage, config.OpenProjectUrl, config.TmetricDummyProjectId)
-	// the serviceUrl for the dummy task has always to be "https://community.openproject.org"
-	// otherwise tmetric does not recognize the integration and does not allow to create the external task
-	dummyTimeEntry.ServiceUrl = "https://community.openproject.org"
+	dummyTimeEntry.ServiceUrl = config.TmetricExternalTaskLink
 	dummyTimerString, _ := json.Marshal(dummyTimeEntry)
 	httpClient := resty.New()
 	resp, err := httpClient.R().

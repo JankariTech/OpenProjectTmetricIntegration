@@ -42,22 +42,15 @@ func validateOpenProjectWorkPackage(input string) error {
 }
 
 func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
-	// get all entries that belong to the client and do not have an external link
-	var entriesWithoutIssue []tmetric.TimeEntry
-	for _, entry := range timeEntries {
-		if entry.Project.Client.Id == config.ClientIdInTmetric && entry.Task.ExternalLink.IssueId == "" {
-			entriesWithoutIssue = append(entriesWithoutIssue, entry)
-		}
-	}
-
-	if len(entriesWithoutIssue) > 0 {
+	entriesWithoutLinkToOpenProject := tmetric.GetEntriesWithoutLinkToOpenProject(config, timeEntries)
+	if len(entriesWithoutLinkToOpenProject) > 0 {
 		fmt.Println("Some time-entries do not have any workpackages assigned")
 	}
 
 	spinner := newSpinner()
 	defer spinner.Stop()
 
-	for _, entry := range entriesWithoutIssue {
+	for _, entry := range entriesWithoutLinkToOpenProject {
 		prompt := promptui.Prompt{
 			Label: fmt.Sprintf(
 				"%v => %v %v-%v. Provide a WP number to be assigned to this time-entry (Enter to skip)",

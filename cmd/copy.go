@@ -44,7 +44,7 @@ func checkTmetricEntries(tmetricUser tmetric.User, config *config.Config) ([]tme
 		)
 	}
 
-	if len(tmetric.GetEntriesWithoutLinkToOpenProject(timeEntries)) > 0 {
+	if len(tmetric.GetEntriesWithoutLinkToOpenProject(config, timeEntries)) > 0 {
 		return nil, fmt.Errorf(
 			"some time-entries are not linked to an OpenProject work-package, run the 'check tmetric' command to fix it",
 		)
