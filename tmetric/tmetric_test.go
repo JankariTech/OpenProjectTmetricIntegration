@@ -8,6 +8,97 @@ import (
 	"testing"
 )
 
+func Test_GetEntriesWithoutLinkToOpenProject(t *testing.T) {
+	tests := []struct {
+		name string
+		task Task
+	}{
+		{
+			name: "empty task",
+			task: Task{},
+		},
+		{
+			name: "no external link",
+			task: Task{
+				Id:   123,
+				Name: "some WP",
+			},
+		},
+		{
+			name: "link is not to openproject",
+			task: Task{
+				Id:   345,
+				Name: "some WP",
+				ExternalLink: ExternalLink{
+					Link:    "https://some_host/work_packages/123",
+					IssueId: "#123",
+				},
+			},
+		},
+		{
+			name: "IssueId is empty",
+			task: Task{
+				Id:   345,
+				Name: "some WP",
+				ExternalLink: ExternalLink{
+					Link:    "https://community.openproject.org/work_packages/123",
+					IssueId: "",
+				},
+			},
+		},
+		{
+			name: "IssueId has wrong format",
+			task: Task{
+				Id:   345,
+				Name: "some WP",
+				ExternalLink: ExternalLink{
+					Link:    "https://community.openproject.org/work_packages/123",
+					IssueId: "!123",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// adds a correct entry at the beginning and the end and makes sure the invalid
+			// entry is still in the result
+			config := &config.Config{
+				ClientIdInTmetric:       123,
+				TmetricExternalTaskLink: "https://community.openproject.org/",
+			}
+			validTimeEntry := TimeEntry{
+				Project: Project{
+					Client: Client{Id: 123},
+					Name:   "Project1",
+				},
+				Note: "correct entry",
+				Task: Task{
+					Id:   345,
+					Name: "some WP",
+					ExternalLink: ExternalLink{
+						Link:    "https://community.openproject.org/work_packages/123",
+						IssueId: "#123",
+					},
+				},
+			}
+			invalidTimeEntry := TimeEntry{
+				Project: Project{
+					Client: Client{Id: 123},
+					Name:   "Project1",
+				},
+				Note: "invalid entry",
+				Task: tt.task,
+			}
+			timeEntriesToCheck := append([]TimeEntry{invalidTimeEntry}, validTimeEntry)
+			timeEntriesToCheck = append([]TimeEntry{validTimeEntry}, timeEntriesToCheck...)
+			result := GetEntriesWithoutLinkToOpenProject(config, timeEntriesToCheck)
+			if !reflect.DeepEqual(result, []TimeEntry{invalidTimeEntry}) {
+				t.Errorf("got %v, want %v", result, []TimeEntry{invalidTimeEntry})
+			}
+		})
+	}
+}
+
 func Test_GetEntriesWithoutWorkType(t *testing.T) {
 	type args struct {
 		timeEntries []TimeEntry
