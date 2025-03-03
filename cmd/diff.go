@@ -19,6 +19,12 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
@@ -26,11 +32,6 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"os"
-	"path"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type tableRow struct {
@@ -126,6 +127,7 @@ var diffCmd = &cobra.Command{
 			{Number: 4, WidthMax: widthContentColumns},
 		})
 
+		totalTimeDiff := 0
 		for currentDay := start; !currentDay.After(end); currentDay = currentDay.AddDate(0, 0, 1) {
 			row := tableRow{}
 			row.Date = currentDay.Format("2006-01-02")
@@ -178,9 +180,13 @@ var diffCmd = &cobra.Command{
 				}
 			}
 			if sumDurationTmetric > sumDurationOpenProject {
-				row.DiffInTime = strconv.Itoa(sumDurationTmetric - sumDurationOpenProject)
+				diff := sumDurationTmetric - sumDurationOpenProject
+				row.DiffInTime = strconv.Itoa(diff)
+				totalTimeDiff += diff
 			} else {
-				row.DiffInTime = strconv.Itoa(sumDurationOpenProject - sumDurationTmetric)
+				diff := sumDurationOpenProject - sumDurationTmetric
+				row.DiffInTime = strconv.Itoa(diff)
+				totalTimeDiff += diff
 			}
 
 			outputTable.AppendRow(table.Row{
@@ -193,6 +199,14 @@ var diffCmd = &cobra.Command{
 			})
 			outputTable.AppendSeparator()
 		}
+		outputTable.AppendRow(table.Row{
+			"",
+			"",
+			"",
+			"Total Diff",
+			"",
+			strconv.Itoa(totalTimeDiff),
+		})
 		outputTable.Render()
 	},
 }
