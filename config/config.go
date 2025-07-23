@@ -32,6 +32,7 @@ type Config struct {
 	TmetricAPIV3BaseUrl                string
 	TmetricDummyProjectId              int
 	TmetricTagTransferredToOpenProject string
+	TmetricExternalTaskLink            string
 }
 
 func NewConfig() *Config {
@@ -69,5 +70,8 @@ func NewConfig() *Config {
 		TmetricAPIV3BaseUrl:                "https://app.tmetric.com/api/v3/",
 		TmetricDummyProjectId:              tmetricDummyProjectId,
 		TmetricTagTransferredToOpenProject: "transferred-to-openproject",
+		// this value has always to be "https://community.openproject.org"
+		// otherwise tmetric does not recognize the integration and does not allow to create the external task
+		TmetricExternalTaskLink:            "https://community.openproject.org/",
 	}
 }

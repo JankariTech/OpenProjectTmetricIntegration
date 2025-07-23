@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 // ClientV2 represents a client that is returned by the Tmetric API V2
@@ -212,10 +213,14 @@ func GetEntriesWithoutWorkType(timeEntries []TimeEntry) []TimeEntry {
 	return entriesWithoutWorkType
 }
 
-func GetEntriesWithoutLinkToOpenProject(timeEntries []TimeEntry) []TimeEntry {
+func GetEntriesWithoutLinkToOpenProject(config *config.Config, timeEntries []TimeEntry) []TimeEntry {
 	var entriesWithoutLink []TimeEntry
 	for _, entry := range timeEntries {
-		if entry.Task.Id == 0 {
+		_, err := entry.GetIssueIdAsInt()
+		if entry.Task.Id == 0 ||
+			err != nil ||
+			entry.Task.ExternalLink.IssueId == "" ||
+			(!strings.HasPrefix(entry.Task.ExternalLink.Link, config.TmetricExternalTaskLink+"work_packages")) {
 			entriesWithoutLink = append(entriesWithoutLink, entry)
 		}
 	}
