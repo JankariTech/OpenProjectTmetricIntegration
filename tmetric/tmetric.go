@@ -5,9 +5,138 @@ import (
 	"fmt"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/go-resty/resty/v2"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 )
+
+// ClientV2 represents a client that is returned by the Tmetric API V2
+// see https://app.tmetric.com/api-docs/v2/#/Clients/clients-get-api-accounts-accountid-clients
+type ClientV2 struct {
+	Id   int    `json:"clientId"`
+	Name string `json:"clientName"`
+}
+
+// TagV2 represents a tag that is returned by the Tmetric API V2
+// see https://app.tmetric.com/api-docs/v2/#/Tags/tags-get-api-accounts-accountid-tags
+type TagV2 struct {
+	Id         int    `json:"tagId"`
+	Name       string `json:"tagName"`
+	IsWorkType bool   `json:"isWorkType"`
+}
+
+type Team struct {
+	Name string `json:"name"`
+	Id   int    `json:"id"`
+}
+
+func GetAllTeams(config *config.Config, tmetricUser User) ([]Team, error) {
+	httpClient := resty.New()
+	tmetricUrl, _ := url.JoinPath(
+		config.TmetricAPIV3BaseUrl, "accounts/", strconv.Itoa(tmetricUser.ActiveAccountId), "/teams/managed",
+	)
+	resp, err := httpClient.R().
+		SetAuthToken(config.TmetricToken).
+		Get(tmetricUrl)
+	if err != nil || resp.StatusCode() != 200 {
+		return nil, fmt.Errorf(
+			"cannot read teams from tmetric. Error: '%v'. HTTP status code: %v", err, resp.StatusCode(),
+		)
+	}
+	var teams []Team
+	err = json.Unmarshal(resp.Body(), &teams)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing teams response: %v\n", err)
+	}
+	return teams, nil
+}
+
+func getTeamByName(config *config.Config, tmetricUser User, name string) (Team, error) {
+	teams, err := GetAllTeams(config, tmetricUser)
+	if err != nil {
+		return Team{}, err
+	}
+	for _, team := range teams {
+		if team.Name == name {
+			return team, nil
+		}
+	}
+	return Team{}, fmt.Errorf("could not find any team with name '%v'", name)
+}
+
+func GetAllWorkTypes(config *config.Config, tmetricUser User) ([]Tag, error) {
+	httpClient := resty.New()
+	tmetricUrl, _ := url.JoinPath(
+		config.TmetricAPIBaseUrl, "accounts/", strconv.Itoa(tmetricUser.ActiveAccountId), "/tags",
+	)
+	resp, err := httpClient.R().
+		SetAuthToken(config.TmetricToken).
+		Get(tmetricUrl)
+	if err != nil || resp.StatusCode() != 200 {
+		return nil, fmt.Errorf(
+			"cannot read tags from tmetric. Error: '%v'. HTTP status code: %v", err, resp.StatusCode(),
+		)
+	}
+	var tags []TagV2
+	err = json.Unmarshal(resp.Body(), &tags)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing tags response: %v\n", err)
+	}
+	var workTypes []Tag
+	for _, tag := range tags {
+		if tag.IsWorkType {
+			workTypes = append(workTypes, Tag{
+				Id:         tag.Id,
+				Name:       tag.Name,
+				IsWorkType: tag.IsWorkType,
+			})
+		}
+	}
+	return workTypes, err
+}
+
+func getWorkTypeByName(config *config.Config, tmetricUser User, name string) (Tag, error) {
+	worktypes, err := GetAllWorkTypes(config, tmetricUser)
+	if err != nil {
+		return Tag{}, err
+	}
+	for _, tag := range worktypes {
+		if tag.Name == name {
+			return tag, nil
+		}
+	}
+	return Tag{}, fmt.Errorf("could not find any work type with name '%v'", name)
+}
+
+func getClientByName(config *config.Config, tmetricUser User, name string) (Client, error) {
+	httpClient := resty.New()
+	tmetricUrl, _ := url.JoinPath(
+		config.TmetricAPIBaseUrl, "accounts/", strconv.Itoa(tmetricUser.ActiveAccountId), "/clients",
+	)
+	resp, err := httpClient.R().
+		SetAuthToken(config.TmetricToken).
+		Get(tmetricUrl)
+	if err != nil || resp.StatusCode() != 200 {
+		return Client{}, fmt.Errorf(
+			"cannot read clients from tmetric. Error: '%v'. HTTP status code: %v", err, resp.StatusCode(),
+		)
+	}
+	var clients []ClientV2
+	err = json.Unmarshal(resp.Body(), &clients)
+	if err != nil {
+		return Client{}, fmt.Errorf("error parsing clients response: %v\n", err)
+	}
+	for _, client := range clients {
+		if client.Name == name {
+			return Client{
+				Id:   client.Id,
+				Name: client.Name,
+			}, nil
+		}
+	}
+	return Client{}, fmt.Errorf("could not find any client with name '%v'", name)
+}
 
 func GetAllTimeEntries(config *config.Config, tmetricUser User, startDate string, endDate string) ([]TimeEntry, error) {
 	httpClient := resty.New()
