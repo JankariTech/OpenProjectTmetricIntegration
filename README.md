@@ -89,3 +89,6 @@ go run main.go export --template template.tmpl
 
 #### work for a specific time period
 By default, the script will work with the current calendar month, but the start and end date can be configured with the `--start` and `--end` flags. The date format is `YYYY-MM-DD`.
+
+#### limit by project
+To limit the time entries to a specific project, use the `--project` flag with the name of the project. This flag can be used multiple times to include multiple projects.
