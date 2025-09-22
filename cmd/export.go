@@ -19,19 +19,21 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
-	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
-	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
-	"github.com/Masterminds/sprig/v3"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
+	"github.com/Masterminds/sprig/v3"
+	"github.com/spf13/cobra"
 )
 
 var arbitraryString []string
+var projects []string
 var tmplFile string
 
 var exportCmd = &cobra.Command{
@@ -58,7 +60,13 @@ var exportCmd = &cobra.Command{
 				return arbitraryString[i]
 			},
 			"DetailedReport": func(clientName string, tagName string, groupName string) tmetric.Report {
-				report, _ := tmetric.GetDetailedReport(config, tmetricUser, clientName, tagName, groupName, startDate, endDate)
+				report, err := tmetric.GetDetailedReport(
+					config, tmetricUser, clientName, tagName, groupName, startDate, endDate, projects,
+				)
+				if err != nil {
+					_, _ = fmt.Fprint(os.Stderr, err)
+					os.Exit(1)
+				}
 				return report
 			},
 			"AllWorkTypes": func() []tmetric.Tag {
@@ -133,4 +141,11 @@ func init() {
 	exportCmd.MarkFlagRequired("arbitraryString")
 	exportCmd.Flags().StringVarP(&tmplFile, "template", "t", today, "the template file")
 	exportCmd.MarkFlagRequired("template")
+	exportCmd.Flags().StringArrayVarP(
+		&projects,
+		"project",
+		"p",
+		nil,
+		"name of the tmetric project to include in the report (can be specified multiple times)",
+	)
 }

@@ -3,11 +3,12 @@ package tmetric
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
-	"github.com/go-resty/resty/v2"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/go-resty/resty/v2"
 )
 
 type ReportItem struct {
@@ -55,7 +56,7 @@ func (reportItem *ReportItem) getDuration() (time.Duration, error) {
 }
 
 func GetDetailedReport(
-	config *config.Config, tmetricUser User, clientName string, tagName string, groupName string, startDate string, endDate string,
+	config *config.Config, tmetricUser User, clientName string, tagName string, groupName string, startDate string, endDate string, projects []string,
 ) (Report, error) {
 	client, err := getClientByName(config, tmetricUser, clientName)
 	if err != nil {
@@ -66,6 +67,17 @@ func GetDetailedReport(
 	if err != nil {
 		return Report{}, err
 	}
+
+	var projectsIds []string // we need a slice of strings for the URL parameters, so let's declare it a string slice
+	for _, projectName := range projects {
+		project, err := getProjectByName(config, tmetricUser, projectName)
+		if err != nil {
+			return Report{}, err
+		}
+
+		projectsIds = append(projectsIds, strconv.Itoa(project.Id))
+	}
+
 	httpClient := resty.New()
 	tmetricUrl, _ := url.JoinPath(config.TmetricAPIBaseUrl, "reports/detailed")
 	request := httpClient.R()
@@ -87,6 +99,9 @@ func GetDetailedReport(
 		SetQueryParam("AccountId", strconv.Itoa(tmetricUser.ActiveAccountId)).
 		SetQueryParam("ClientList", strconv.Itoa(client.Id)).
 		SetQueryParam("GroupList", strconv.Itoa(team.Id)).
+		SetQueryParamsFromValues(url.Values{
+			"ProjectList": projectsIds,
+		}).
 		SetQueryParam("StartDate", startDate).
 		SetQueryParam("EndDate", endDate).
 		Get(tmetricUrl)

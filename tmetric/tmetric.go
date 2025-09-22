@@ -3,12 +3,13 @@ package tmetric
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
-	"github.com/go-resty/resty/v2"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/go-resty/resty/v2"
 )
 
 // ClientV2 represents a client that is returned by the Tmetric API V2
@@ -24,6 +25,13 @@ type TagV2 struct {
 	Id         int    `json:"tagId"`
 	Name       string `json:"tagName"`
 	IsWorkType bool   `json:"isWorkType"`
+}
+
+// ProjectV2 represents a project that is returned by the Tmetric API V2
+// see https://app.tmetric.com/api-docs/v2/#/ProjectsV2/projectsv2-get-api-accounts-accountid-projects
+type ProjectV2 struct {
+	Id   int    `json:"projectId"`
+	Name string `json:"projectName"`
 }
 
 type Team struct {
@@ -63,6 +71,40 @@ func getTeamByName(config *config.Config, tmetricUser User, name string) (Team, 
 		}
 	}
 	return Team{}, fmt.Errorf("could not find any team with name '%v'", name)
+}
+
+func getAllProjects(config *config.Config, tmetricUser User) ([]ProjectV2, error) {
+	httpClient := resty.New()
+	tmetricUrl, _ := url.JoinPath(
+		config.TmetricAPIBaseUrl, "accounts/", strconv.Itoa(tmetricUser.ActiveAccountId), "/projects",
+	)
+	resp, err := httpClient.R().
+		SetAuthToken(config.TmetricToken).
+		Get(tmetricUrl)
+	if err != nil || resp.StatusCode() != 200 {
+		return nil, fmt.Errorf(
+			"cannot read projects from tmetric. Error: '%v'. HTTP status code: %v", err, resp.StatusCode(),
+		)
+	}
+	var projects []ProjectV2
+	err = json.Unmarshal(resp.Body(), &projects)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing project response: %v\n", err)
+	}
+	return projects, nil
+}
+
+func getProjectByName(config *config.Config, tmetricUser User, name string) (ProjectV2, error) {
+	projects, err := getAllProjects(config, tmetricUser)
+	if err != nil {
+		return ProjectV2{}, err
+	}
+	for _, project := range projects {
+		if project.Name == name {
+			return project, nil
+		}
+	}
+	return ProjectV2{}, fmt.Errorf("could not find any project in tmetric with name '%v'", name)
 }
 
 func GetAllWorkTypes(config *config.Config, tmetricUser User) ([]Tag, error) {
