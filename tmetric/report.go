@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
@@ -12,9 +13,11 @@ import (
 )
 
 type ReportItem struct {
-	StartTime string `json:"startTime"`
-	EndTime   string `json:"endTime"`
-	User      string `json:"user"`
+	StartTime     string `json:"startTime"`
+	EndTime       string `json:"endTime"`
+	User          string `json:"user"`
+	IssueId       string `json:"issueId"`
+	WorkpackageId string
 }
 
 type Report struct {
@@ -118,6 +121,7 @@ func GetDetailedReport(
 	}
 	var report Report
 	for _, item := range reportItems {
+		item.WorkpackageId = strings.Trim(item.IssueId, "#") // remove leading '#' from issue id
 		report.ReportItems = append(report.ReportItems, item)
 		itemDuration, _ := item.getDuration()
 		report.Duration += itemDuration

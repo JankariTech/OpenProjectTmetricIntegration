@@ -20,14 +20,15 @@ package openproject
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
+
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/go-resty/resty/v2"
 	"github.com/tidwall/gjson"
-	"net/url"
-	"strconv"
 )
 
-func GetAllTimeEntries(config *config.Config, user User, startDate string, endDate string) ([]TimeEntry, error) {
+func GetAllTimeEntries(config *config.Config, user User, startDate string, endDate string, workpackages []any) ([]TimeEntry, error) {
 	httpClient := resty.New()
 	openProjectUrl, _ := url.JoinPath(config.OpenProjectUrl, "/api/v3/time_entries")
 	var userString string
@@ -38,18 +39,20 @@ func GetAllTimeEntries(config *config.Config, user User, startDate string, endDa
 	} else {
 		userString = strconv.Itoa(user.Id)
 	}
+
+	filters := "["
+	if workpackages != nil && len(workpackages) > 0 {
+		entityIds, _ := json.Marshal(workpackages)
+		filters += fmt.Sprintf(`{"entity_id": {"operator":"=","values": %v}},`, string(entityIds))
+	}
+	// the operator is '<>d' ("\u003c\u003ed") and means between the dates
+	filters += fmt.Sprintf(`{"user":{"operator":"=","values":["%v"]}},{"spent_on":{"operator":"\u003c\u003ed","values":["%v","%v"]}}]`, userString, startDate, endDate)
 	resp, err := httpClient.R().
 		SetBasicAuth("apikey", config.OpenProjectToken).
 		SetHeader("Content-Type", "application/json").
 		SetQueryParam("pageSize", "3000").
 		SetQueryParam("sortBy", "[[\"updated_at\",\"asc\"]]").
-		// the operator is '<>d' and means between the dates
-		SetQueryParam("filters", fmt.Sprintf(
-			`[{"user":{"operator":"=","values":["%v"]}},{"spent_on":{"operator":"\u003c\u003ed","values":["%v","%v"]}}]`,
-			userString,
-			startDate,
-			endDate),
-		).
+		SetQueryParam("filters", filters).
 		Get(openProjectUrl)
 	if err != nil || resp.StatusCode() != 200 {
 		return nil, fmt.Errorf(
