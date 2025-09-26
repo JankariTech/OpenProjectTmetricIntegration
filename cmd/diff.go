@@ -107,7 +107,7 @@ var diffCmd = &cobra.Command{
 			}
 		}
 
-		openProjectTimeEntries, err := openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate)
+		openProjectTimeEntries, err := openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate, nil)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)

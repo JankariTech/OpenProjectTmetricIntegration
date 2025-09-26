@@ -89,14 +89,14 @@ var exportCmd = &cobra.Command{
 				startTime, _ := time.Parse("2006-01-02", startDate)
 				return startTime.Format("01/2006")
 			},
-			"AllTimeEntriesFromOpenProject": func(user string) []openproject.TimeEntry {
+			"AllTimeEntriesFromOpenProject": func(user string, workpackages []any) []openproject.TimeEntry {
 				var openProjectUser openproject.User
 				openProjectUser, err := openproject.FindUserByName(config, user)
 				if err != nil {
 					_, _ = fmt.Fprint(os.Stderr, err)
 					os.Exit(1)
 				}
-				openProjectTimeEntries, err := openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate)
+				openProjectTimeEntries, err := openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate, workpackages)
 				if err != nil {
 					_, _ = fmt.Fprint(os.Stderr, err)
 					os.Exit(1)
