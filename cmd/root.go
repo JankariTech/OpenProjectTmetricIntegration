@@ -19,9 +19,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/briandowns/spinner"
 	"os"
 	"time"
+
+	"github.com/briandowns/spinner"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -30,6 +31,7 @@ import (
 var cfgFile string
 var startDate string
 var endDate string
+var exportDate string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
