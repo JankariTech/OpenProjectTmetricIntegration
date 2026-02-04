@@ -41,6 +41,7 @@ type tableRow struct {
 	OpenProjectEntry    string
 	OpenProjectDuration string
 	DiffInTime          string
+	Warnings            string
 }
 
 var widthOfFixedColumns = 45 // rough size of all columns that have a fixed width
@@ -119,7 +120,7 @@ var diffCmd = &cobra.Command{
 		outputTable.SetOutputMirror(os.Stdout)
 
 		outputTable.AppendHeader(
-			table.Row{"date", "tmetric entry", "tm\ndur", "OpenProject entry", "OP\ndur", "time\ndiff"},
+			table.Row{"date", "tmetric entry", "tm\ndur", "OpenProject entry", "OP\ndur", "time\ndiff", "warnings"},
 		)
 		widthContentColumns := int((getTerminalWidth() - widthOfFixedColumns) / 2)
 		outputTable.SetColumnConfigs([]table.ColumnConfig{
@@ -177,7 +178,29 @@ var diffCmd = &cobra.Command{
 					sumDurationOpenProject += int(duration.Minutes())
 					humanReadableDuration, _ := entry.GetHumanReadableDuration()
 					row.OpenProjectDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
+					workPackage, _ := openproject.GetWorkpackage(
+						path.Base(entry.Links.WorkPackage.Href), config,
+					)
+					countWarnings := 0
+					if !workPackage.Embedded.Project.Active {
+						row.Warnings += text.Snip("- inactive project\n", widthContentColumns, "~")
+						countWarnings++
+					}
+					if !workPackage.Embedded.Project.Favorited {
+						row.Warnings += text.Snip("- not favorite project\n", widthContentColumns, "~")
+						countWarnings++
+					}
+					if workPackage.Embedded.Assignee.Name != tmetricUser.Name && workPackage.Embedded.Assignee.Name != config.OpenProjectTeam {
+						row.Warnings += text.Snip("- not my assignment\n", widthContentColumns, "~")
+						countWarnings++
+					}
+					// Add the remaining newlines to make it 6 rows total
+					for i := countWarnings; i < 6; i++ {
+						row.Warnings += "\n"
+					}
+
 				}
+
 			}
 			if sumDurationTmetric > sumDurationOpenProject {
 				diff := sumDurationTmetric - sumDurationOpenProject
@@ -188,7 +211,6 @@ var diffCmd = &cobra.Command{
 				row.DiffInTime = strconv.Itoa(diff)
 				totalTimeDiff += diff
 			}
-
 			outputTable.AppendRow(table.Row{
 				row.Date,
 				strings.Trim(row.TmetricEntry, "\n"),
@@ -196,6 +218,7 @@ var diffCmd = &cobra.Command{
 				strings.Trim(row.OpenProjectEntry, "\n"),
 				strings.Trim(row.OpenProjectDuration, "\n"),
 				row.DiffInTime,
+				row.Warnings,
 			})
 			outputTable.AppendSeparator()
 		}
