@@ -20,15 +20,27 @@ package openproject
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/go-resty/resty/v2"
 	"github.com/tidwall/gjson"
-	"net/url"
 )
 
 type WorkPackage struct {
-	Subject string `json:"subject"`
-	Id      int    `json:"id"`
+	Subject  string `json:"subject"`
+	Id       int    `json:"id"`
+	Embedded struct {
+		Project struct {
+			Id        int    `json:"id"`
+			Name      string `json:"name"`
+			Active    bool   `json:"active"`
+			Favorited bool   `json:"favorited"`
+		} `json:"project"`
+		Assignee struct {
+			Name string `json:"name"`
+		} `json:"assignee"`
+	} `json:"_embedded"`
 }
 
 func NewWorkPackage(id int, subject string) WorkPackage {
