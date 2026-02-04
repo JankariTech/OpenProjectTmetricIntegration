@@ -59,6 +59,9 @@ var exportCmd = &cobra.Command{
 			"ArbitraryString": func(i int) string {
 				return arbitraryString[i]
 			},
+			"ExportDate": func() string {
+				return exportDate
+			},
 			"DetailedReport": func(clientName string, tagName string, groupName string) tmetric.Report {
 				report, err := tmetric.GetDetailedReport(
 					config, tmetricUser, clientName, tagName, groupName, startDate, endDate, projects,
@@ -131,6 +134,9 @@ func init() {
 	exportCmd.Flags().StringVarP(&startDate, "start", "s", firstDayOfMonth, "start date")
 	today := time.Now().Format("2006-01-02")
 	exportCmd.Flags().StringVarP(&endDate, "end", "e", today, "end date")
+	exportCmd.Flags().StringVarP(
+		&exportDate, "date", "d", today, "date entry to be used in the export",
+	)
 	exportCmd.Flags().StringArrayVarP(
 		&arbitraryString,
 		"arbitraryString",
