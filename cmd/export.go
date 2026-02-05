@@ -72,6 +72,9 @@ var exportCmd = &cobra.Command{
 				}
 				return report
 			},
+			"AllSelectedProjects": func() []string {
+				return projects
+			},
 			"AllWorkTypes": func() []tmetric.Tag {
 				workTypes, _ := tmetric.GetAllWorkTypes(config, tmetricUser)
 				return workTypes

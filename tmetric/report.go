@@ -13,11 +13,15 @@ import (
 )
 
 type ReportItem struct {
-	StartTime     string `json:"startTime"`
-	EndTime       string `json:"endTime"`
-	User          string `json:"user"`
-	IssueId       string `json:"issueId"`
-	WorkpackageId string
+	StartTime          string `json:"startTime"`
+	EndTime            string `json:"endTime"`
+	User               string `json:"user"`
+	IssueId            string `json:"issueId"`
+	Project            string `json:"project"`
+	Client             string `json:"client"`
+	Description        string `json:"description"`
+	WorkpackageId      string
+	CalculatedDuration time.Duration
 }
 
 type Report struct {
@@ -122,9 +126,9 @@ func GetDetailedReport(
 	var report Report
 	for _, item := range reportItems {
 		item.WorkpackageId = strings.Trim(item.IssueId, "#") // remove leading '#' from issue id
+		item.CalculatedDuration, _ = item.getDuration()
 		report.ReportItems = append(report.ReportItems, item)
-		itemDuration, _ := item.getDuration()
-		report.Duration += itemDuration
+		report.Duration += item.CalculatedDuration
 	}
 	return report, nil
 }
