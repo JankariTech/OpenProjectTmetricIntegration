@@ -77,6 +77,9 @@ var diffCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		spinner := newSpinner()
+		defer spinner.Stop()
+		spinner.Start()
 		config := config.NewConfig()
 
 		tmetricUserMe := tmetric.NewUser()
@@ -130,6 +133,9 @@ var diffCmd = &cobra.Command{
 
 		totalTimeDiff := 0
 		for currentDay := start; !currentDay.After(end); currentDay = currentDay.AddDate(0, 0, 1) {
+			spinner.Stop()
+			spinner.Suffix = fmt.Sprintf(" %s", currentDay.Format("2006-01-02"))
+			spinner.Start()
 			row := tableRow{}
 			row.Date = currentDay.Format("2006-01-02")
 			sumDurationTmetric := 0
@@ -223,6 +229,7 @@ var diffCmd = &cobra.Command{
 			})
 			outputTable.AppendSeparator()
 		}
+		spinner.Stop()
 		outputTable.AppendRow(table.Row{
 			"",
 			"",
