@@ -44,7 +44,7 @@ type tableRow struct {
 	Warnings            string
 }
 
-var widthOfFixedColumns = 45 // rough size of all columns that have a fixed width
+var widthOfFixedColumns = 61 // rough combined size of all columns that have a fixed width
 var userNameFromCmd string
 
 // tries to find out the width of the terminal and returns 80 if it fails
@@ -183,17 +183,18 @@ var diffCmd = &cobra.Command{
 					)
 					countWarnings := 0
 					if !workPackage.Embedded.Project.Active {
-						row.Warnings += text.Snip("- inactive project\n", widthContentColumns, "~")
-						countWarnings++
+						row.Warnings += "- inactive\n  project\n"
+						countWarnings = countWarnings + 2
 					}
 					if !workPackage.Embedded.Project.Favorited {
-						row.Warnings += text.Snip("- not favorite project\n", widthContentColumns, "~")
-						countWarnings++
+						row.Warnings += "- not favorite\n  project\n"
+						countWarnings = countWarnings + 2
 					}
 					if workPackage.Embedded.Assignee.Name != tmetricUser.Name && workPackage.Embedded.Assignee.Name != config.OpenProjectTeam {
-						row.Warnings += text.Snip("- not my assignment\n", widthContentColumns, "~")
-						countWarnings++
+						row.Warnings += "- not my\n  assignment\n"
+						countWarnings = countWarnings + 2
 					}
+
 					// Add the remaining newlines to make it 6 rows total
 					for i := countWarnings; i < 6; i++ {
 						row.Warnings += "\n"
