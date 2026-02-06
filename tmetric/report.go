@@ -77,7 +77,7 @@ func GetDetailedReport(
 
 	var projectsIds []string // we need a slice of strings for the URL parameters, so let's declare it a string slice
 	for _, projectName := range projects {
-		project, err := getProjectByName(config, tmetricUser, projectName)
+		project, err := getProjectByName(config, tmetricUser, projectName, client)
 		if err != nil {
 			return Report{}, err
 		}
