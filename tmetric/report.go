@@ -65,7 +65,7 @@ func (reportItem *ReportItem) getDuration() (time.Duration, error) {
 func GetDetailedReport(
 	config *config.Config, tmetricUser User, clientName string, tagName string, groupName string, startDate string, endDate string, projects []string,
 ) (Report, error) {
-	client, err := getClientByName(config, tmetricUser, clientName)
+	client, err := GetClientByName(config, tmetricUser, clientName)
 	if err != nil {
 		return Report{}, err
 	}
