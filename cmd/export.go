@@ -57,7 +57,11 @@ var exportCmd = &cobra.Command{
 
 		funcMap := template.FuncMap{
 			"ArbitraryString": func(i int) string {
-				return arbitraryString[i]
+				if len(arbitraryString) >= i+1 {
+					return arbitraryString[i]
+				}
+
+				return ""
 			},
 			"ExportDate": func() string {
 				return exportDate
