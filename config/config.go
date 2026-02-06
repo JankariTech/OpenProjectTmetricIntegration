@@ -19,13 +19,15 @@ package config
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
+
+	"github.com/spf13/viper"
 )
 
 type Config struct {
 	OpenProjectUrl                     string
 	OpenProjectToken                   string
+	OpenProjectTeam                    string
 	TmetricToken                       string
 	ClientIdInTmetric                  int
 	TmetricAPIBaseUrl                  string
@@ -46,6 +48,7 @@ func NewConfig() *Config {
 		fmt.Fprintln(os.Stderr, "openproject.token not set")
 		os.Exit(1)
 	}
+	openProjectTeam := viper.GetString("openproject.team")
 	tmetricToken := viper.GetString("tmetric.token")
 	if tmetricToken == "" {
 		fmt.Fprintln(os.Stderr, "tmetric.token not set")
@@ -64,6 +67,7 @@ func NewConfig() *Config {
 	return &Config{
 		OpenProjectUrl:                     openProjectUrl,
 		OpenProjectToken:                   openProjectToken,
+		OpenProjectTeam:                    openProjectTeam,
 		TmetricToken:                       tmetricToken,
 		ClientIdInTmetric:                  clientIdInTmetric,
 		TmetricAPIBaseUrl:                  "https://app.tmetric.com/api/",
@@ -72,6 +76,6 @@ func NewConfig() *Config {
 		TmetricTagTransferredToOpenProject: "transferred-to-openproject",
 		// this value has always to be "https://community.openproject.org"
 		// otherwise tmetric does not recognize the integration and does not allow to create the external task
-		TmetricExternalTaskLink:            "https://community.openproject.org/",
+		TmetricExternalTaskLink: "https://community.openproject.org/",
 	}
 }

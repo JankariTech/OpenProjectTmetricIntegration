@@ -41,9 +41,10 @@ type tableRow struct {
 	OpenProjectEntry    string
 	OpenProjectDuration string
 	DiffInTime          string
+	Warnings            string
 }
 
-var widthOfFixedColumns = 45 // rough size of all columns that have a fixed width
+var widthOfFixedColumns = 61 // rough combined size of all columns that have a fixed width
 var userNameFromCmd string
 
 // tries to find out the width of the terminal and returns 80 if it fails
@@ -76,6 +77,9 @@ var diffCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		spinner := newSpinner()
+		defer spinner.Stop()
+		spinner.Start()
 		config := config.NewConfig()
 
 		tmetricUserMe := tmetric.NewUser()
@@ -119,7 +123,7 @@ var diffCmd = &cobra.Command{
 		outputTable.SetOutputMirror(os.Stdout)
 
 		outputTable.AppendHeader(
-			table.Row{"date", "tmetric entry", "tm\ndur", "OpenProject entry", "OP\ndur", "time\ndiff"},
+			table.Row{"date", "tmetric entry", "tm\ndur", "OpenProject entry", "OP\ndur", "time\ndiff", "warnings"},
 		)
 		widthContentColumns := int((getTerminalWidth() - widthOfFixedColumns) / 2)
 		outputTable.SetColumnConfigs([]table.ColumnConfig{
@@ -129,6 +133,9 @@ var diffCmd = &cobra.Command{
 
 		totalTimeDiff := 0
 		for currentDay := start; !currentDay.After(end); currentDay = currentDay.AddDate(0, 0, 1) {
+			spinner.Stop()
+			spinner.Suffix = fmt.Sprintf(" %s", currentDay.Format("2006-01-02"))
+			spinner.Start()
 			row := tableRow{}
 			row.Date = currentDay.Format("2006-01-02")
 			sumDurationTmetric := 0
@@ -177,7 +184,30 @@ var diffCmd = &cobra.Command{
 					sumDurationOpenProject += int(duration.Minutes())
 					humanReadableDuration, _ := entry.GetHumanReadableDuration()
 					row.OpenProjectDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
+					workPackage, _ := openproject.GetWorkpackage(
+						path.Base(entry.Links.WorkPackage.Href), config,
+					)
+					countWarnings := 0
+					if !workPackage.Embedded.Project.Active {
+						row.Warnings += "- inactive\n  project\n"
+						countWarnings = countWarnings + 2
+					}
+					if !workPackage.Embedded.Project.Favorited {
+						row.Warnings += "- not favorite\n  project\n"
+						countWarnings = countWarnings + 2
+					}
+					if workPackage.Embedded.Assignee.Name != tmetricUser.Name && workPackage.Embedded.Assignee.Name != config.OpenProjectTeam {
+						row.Warnings += "- not my\n  assignment\n"
+						countWarnings = countWarnings + 2
+					}
+
+					// Add the remaining newlines to make it 6 rows total
+					for i := countWarnings; i < 6; i++ {
+						row.Warnings += "\n"
+					}
+
 				}
+
 			}
 			if sumDurationTmetric > sumDurationOpenProject {
 				diff := sumDurationTmetric - sumDurationOpenProject
@@ -188,7 +218,6 @@ var diffCmd = &cobra.Command{
 				row.DiffInTime = strconv.Itoa(diff)
 				totalTimeDiff += diff
 			}
-
 			outputTable.AppendRow(table.Row{
 				row.Date,
 				strings.Trim(row.TmetricEntry, "\n"),
@@ -196,9 +225,11 @@ var diffCmd = &cobra.Command{
 				strings.Trim(row.OpenProjectEntry, "\n"),
 				strings.Trim(row.OpenProjectDuration, "\n"),
 				row.DiffInTime,
+				row.Warnings,
 			})
 			outputTable.AppendSeparator()
 		}
+		spinner.Stop()
 		outputTable.AppendRow(table.Row{
 			"",
 			"",

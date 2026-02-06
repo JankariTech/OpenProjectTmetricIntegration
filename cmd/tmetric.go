@@ -20,15 +20,16 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func validateOpenProjectWorkPackage(input string) error {
@@ -51,7 +52,7 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 	defer spinner.Stop()
 
 	for _, entry := range entriesWithoutLinkToOpenProject {
-		prompt := promptui.Prompt{
+		getWPPrompt := promptui.Prompt{
 			Label: fmt.Sprintf(
 				"%v => %v %v-%v. Provide a WP number to be assigned to this time-entry (Enter to skip)",
 				entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
@@ -62,7 +63,7 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 		workpackageFoundOnOpenProject := false
 		for !workpackageFoundOnOpenProject {
 
-			workPackageId, err := prompt.Run()
+			workPackageId, err := getWPPrompt.Run()
 
 			if err != nil {
 				return fmt.Errorf("prompt failed: %v", err)
@@ -82,7 +83,37 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 				continue
 			}
 
-			prompt = promptui.Prompt{
+			if !implausibleProjectConfirmation(
+				workPackage,
+				workPackage.Embedded.Project.Active,
+				"This project is NOT active! ",
+				"Do you want to use a WP from an INACTIVE project?",
+			) {
+				workpackageFoundOnOpenProject = false
+				continue
+			}
+
+			if !implausibleProjectConfirmation(
+				workPackage,
+				workPackage.Embedded.Project.Favorited,
+				"This project is none of your favorite projects!",
+				"Do you really want to use a WP from a not-favorite project?",
+			) {
+				workpackageFoundOnOpenProject = false
+				continue
+			}
+
+			if !implausibleProjectConfirmation(
+				workPackage,
+				workPackage.Embedded.Assignee.Name == tmetricUser.Name || workPackage.Embedded.Assignee.Name == config.OpenProjectTeam,
+				fmt.Sprintf("This WP is not assigned to you but to '%s'!", workPackage.Embedded.Assignee.Name),
+				"Do you really want to use a WP that is not assigned to you?",
+			) {
+				workpackageFoundOnOpenProject = false
+				continue
+			}
+
+			prompt := promptui.Prompt{
 				Label: fmt.Sprintf(
 					"WP: %v. Subject: %v. Update t-metric entry?", workPackage.Id, workPackage.Subject,
 				),
@@ -110,6 +141,23 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 		}
 	}
 	return nil
+}
+
+func implausibleProjectConfirmation(
+	workPackage openproject.WorkPackage, condition bool, issue string, question string,
+) bool {
+	if condition {
+		return true
+	}
+	prompt := promptui.Prompt{
+		Label: fmt.Sprintf(
+			"⚠️  Found WP '%s' in the project '%s'. %s %s",
+			workPackage.Subject, workPackage.Embedded.Project.Name, issue, question,
+		),
+		IsConfirm: true,
+	}
+	result, err := prompt.Run()
+	return err == nil && result == "y"
 }
 
 func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
