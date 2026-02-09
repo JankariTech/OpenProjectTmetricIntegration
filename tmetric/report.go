@@ -13,11 +13,15 @@ import (
 )
 
 type ReportItem struct {
-	StartTime     string `json:"startTime"`
-	EndTime       string `json:"endTime"`
-	User          string `json:"user"`
-	IssueId       string `json:"issueId"`
-	WorkpackageId string
+	StartTime          string `json:"startTime"`
+	EndTime            string `json:"endTime"`
+	User               string `json:"user"`
+	IssueId            string `json:"issueId"`
+	Project            string `json:"project"`
+	Client             string `json:"client"`
+	Description        string `json:"description"`
+	WorkpackageId      string
+	CalculatedDuration time.Duration
 }
 
 type Report struct {
@@ -61,7 +65,7 @@ func (reportItem *ReportItem) getDuration() (time.Duration, error) {
 func GetDetailedReport(
 	config *config.Config, tmetricUser User, clientName string, tagName string, groupName string, startDate string, endDate string, projects []string,
 ) (Report, error) {
-	client, err := getClientByName(config, tmetricUser, clientName)
+	client, err := GetClientByName(config, tmetricUser, clientName)
 	if err != nil {
 		return Report{}, err
 	}
@@ -73,7 +77,7 @@ func GetDetailedReport(
 
 	var projectsIds []string // we need a slice of strings for the URL parameters, so let's declare it a string slice
 	for _, projectName := range projects {
-		project, err := getProjectByName(config, tmetricUser, projectName)
+		project, err := getProjectByName(config, tmetricUser, projectName, client)
 		if err != nil {
 			return Report{}, err
 		}
@@ -122,9 +126,9 @@ func GetDetailedReport(
 	var report Report
 	for _, item := range reportItems {
 		item.WorkpackageId = strings.Trim(item.IssueId, "#") // remove leading '#' from issue id
+		item.CalculatedDuration, _ = item.getDuration()
 		report.ReportItems = append(report.ReportItems, item)
-		itemDuration, _ := item.getDuration()
-		report.Duration += itemDuration
+		report.Duration += item.CalculatedDuration
 	}
 	return report, nil
 }

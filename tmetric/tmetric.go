@@ -73,12 +73,13 @@ func getTeamByName(config *config.Config, tmetricUser User, name string) (Team, 
 	return Team{}, fmt.Errorf("could not find any team with name '%v'", name)
 }
 
-func getAllProjects(config *config.Config, tmetricUser User) ([]ProjectV2, error) {
+func GetAllProjects(config *config.Config, tmetricUser User, client Client) ([]ProjectV2, error) {
 	httpClient := resty.New()
 	tmetricUrl, _ := url.JoinPath(
 		config.TmetricAPIBaseUrl, "accounts/", strconv.Itoa(tmetricUser.ActiveAccountId), "/projects",
 	)
 	resp, err := httpClient.R().
+		SetQueryParam("ClientList", strconv.Itoa(client.Id)).
 		SetAuthToken(config.TmetricToken).
 		Get(tmetricUrl)
 	if err != nil || resp.StatusCode() != 200 {
@@ -94,8 +95,8 @@ func getAllProjects(config *config.Config, tmetricUser User) ([]ProjectV2, error
 	return projects, nil
 }
 
-func getProjectByName(config *config.Config, tmetricUser User, name string) (ProjectV2, error) {
-	projects, err := getAllProjects(config, tmetricUser)
+func getProjectByName(config *config.Config, tmetricUser User, name string, client Client) (ProjectV2, error) {
+	projects, err := GetAllProjects(config, tmetricUser, client)
 	if err != nil {
 		return ProjectV2{}, err
 	}
@@ -151,7 +152,7 @@ func getWorkTypeByName(config *config.Config, tmetricUser User, name string) (Ta
 	return Tag{}, fmt.Errorf("could not find any work type with name '%v'", name)
 }
 
-func getClientByName(config *config.Config, tmetricUser User, name string) (Client, error) {
+func GetClientByName(config *config.Config, tmetricUser User, name string) (Client, error) {
 	httpClient := resty.New()
 	tmetricUrl, _ := url.JoinPath(
 		config.TmetricAPIBaseUrl, "accounts/", strconv.Itoa(tmetricUser.ActiveAccountId), "/clients",

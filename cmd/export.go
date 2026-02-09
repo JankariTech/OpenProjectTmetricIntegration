@@ -57,7 +57,11 @@ var exportCmd = &cobra.Command{
 
 		funcMap := template.FuncMap{
 			"ArbitraryString": func(i int) string {
-				return arbitraryString[i]
+				if len(arbitraryString) >= i+1 {
+					return arbitraryString[i]
+				}
+
+				return ""
 			},
 			"ExportDate": func() string {
 				return exportDate
@@ -71,6 +75,26 @@ var exportCmd = &cobra.Command{
 					os.Exit(1)
 				}
 				return report
+			},
+			"AllSelectedProjects": func() []string {
+				return projects
+			},
+			"AllProjectsOfClient": func(clientName string) []string {
+				client, err := tmetric.GetClientByName(config, tmetricUser, clientName)
+				if err != nil {
+					_, _ = fmt.Fprint(os.Stderr, err)
+					os.Exit(1)
+				}
+				projects, err := tmetric.GetAllProjects(config, tmetricUser, client)
+				if err != nil {
+					_, _ = fmt.Fprint(os.Stderr, err)
+					os.Exit(1)
+				}
+				var projectNames []string
+				for _, project := range projects {
+					projectNames = append(projectNames, project.Name)
+				}
+				return projectNames
 			},
 			"AllWorkTypes": func() []tmetric.Tag {
 				workTypes, _ := tmetric.GetAllWorkTypes(config, tmetricUser)
