@@ -80,6 +80,7 @@ func GetAllProjects(config *config.Config, tmetricUser User, client Client) ([]P
 	)
 	resp, err := httpClient.R().
 		SetQueryParam("ClientList", strconv.Itoa(client.Id)).
+		SetQueryParam("onlyTracked", "true").
 		SetAuthToken(config.TmetricToken).
 		Get(tmetricUrl)
 	if err != nil || resp.StatusCode() != 200 {
