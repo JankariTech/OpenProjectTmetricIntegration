@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
+	"regexp"
 	"strings"
 	"time"
 
@@ -34,8 +34,8 @@ import (
 
 func validateOpenProjectWorkPackage(input string) error {
 	if len(input) > 0 {
-		_, err := strconv.ParseInt(input, 10, 32)
-		if err != nil {
+		matched, err := regexp.MatchString(`^[a-zA-Z0-9-]+$`, input)
+		if err != nil || !matched {
 			return errors.New("Invalid WP")
 		}
 	}
