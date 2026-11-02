@@ -23,6 +23,13 @@ There are some steps that need to be done as the tmetric admin and the OpenProje
 - give the token a name and click on `Create`
 - copy the token
 
+#### Jira
+- go to your account settings (by clicking on your avatar in the top right corner and then on "Account settings")
+- click on `Security`
+- click on `Create and manage API tokens`
+- click on `Create API token`
+- copy the token
+
 #### t-metric
 - go to your profile (by clicking on your avatar in the top right corner)
 - click on `Profile Settings`
@@ -31,17 +38,25 @@ There are some steps that need to be done as the tmetric admin and the OpenProje
 
 ### configure
 
-in your home folder create a file called `.OpenProjectTmetricIntegration.yaml` with the following content (enter your tokens):
+in your home folder create a file called `.OpenProjectTmetricIntegration.yaml` with the following content:
 
 ```yaml
+jira:
+  url: '<url of your jira instance xxx.atlassian.com>'
+  user: '<email of your jira user>'
+  token: <jira token>
+  tmetricClientIds: <array of t-metric clients, who's time needs to be transferred to Jira>
 openproject:
   url: 'https://community.openproject.org'
   token: <openproject token>
+  tmetricClientIds: <array of t-metric clients, who's time needs to be transferred to OpenProject>
 tmetric:
   token: <t-metric token>
-  clientId: <id of the client in tmetric>
   dummyProjectId: <id of the dummy project the admin created>
 ```
+
+The arrays have to have the format `[123, 456]`.
+The client Ids can be found in t-metric, edit a client and check the address. e.g. for the URL `https://app.tmetric.com/#/account/123/clients/4567?tab=general` `4567` is the ID you need.
 
 ### run
 
@@ -51,7 +66,7 @@ go run main.go check tmetric
 ```
 
 The tool with show you any invalid or inconsistent time entries and ask you for data to fix them.
-This step will only adjust data on tmetric, no data will be written to OpenProject.
+This step will only adjust data on tmetric, no data will be written to OpenProject or Jira.
 
 #### transfer the time entries to OpenProject
 ```bash
