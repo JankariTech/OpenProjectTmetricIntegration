@@ -28,6 +28,7 @@ type Config struct {
 	OpenProjectUrl                     string
 	OpenProjectToken                   string
 	OpenProjectTeam                    string
+	OpenProjectTmetricClientIds        []int
 	TmetricToken                       string
 	ClientIdInTmetric                  int
 	TmetricAPIBaseUrl                  string
@@ -35,6 +36,10 @@ type Config struct {
 	TmetricDummyProjectId              int
 	TmetricTagTransferredToOpenProject string
 	TmetricExternalTaskLink            string
+	JiraUrl                            string
+	JiraToken                          string
+	JiraTmetricClientIds               []int
+	JiraUser                           string
 }
 
 func NewConfig() *Config {
@@ -54,22 +59,47 @@ func NewConfig() *Config {
 		fmt.Fprintln(os.Stderr, "tmetric.token not set")
 		os.Exit(1)
 	}
-	clientIdInTmetric := viper.GetInt("tmetric.clientId")
-	if clientIdInTmetric == 0 {
-		fmt.Fprintln(os.Stderr, "tmetric.clientId not set")
+	openProjectTmetricClientIds := viper.GetIntSlice("openproject.tmetricClientIds")
+	if len(openProjectTmetricClientIds) == 0 {
+		fmt.Fprintln(os.Stderr, "openproject.tmetricClientIds not set")
 		os.Exit(1)
 	}
+
 	tmetricDummyProjectId := viper.GetInt("tmetric.dummyProjectId")
-	if clientIdInTmetric == 0 {
+	if tmetricDummyProjectId == 0 {
 		fmt.Fprintln(os.Stderr, "tmetric.dummyProjectId not set")
 		os.Exit(1)
 	}
+
+	jiraUrl := viper.GetString("jira.url")
+	if jiraUrl == "" {
+		fmt.Fprintln(os.Stderr, "jira.url not set")
+		os.Exit(1)
+	}
+	jiraUser := viper.GetString("jira.user")
+	if jiraUser == "" {
+		fmt.Fprintln(os.Stderr, "jira.user not set")
+		os.Exit(1)
+	}
+	jiraToken := viper.GetString("jira.token")
+	if jiraToken == "" {
+		fmt.Fprintln(os.Stderr, "jira.token not set")
+		os.Exit(1)
+	}
+
+	jiraTmetricClientIds := viper.GetIntSlice("jira.tmetricClientIds")
+	if len(jiraTmetricClientIds) == 0 {
+		fmt.Fprintln(os.Stderr, "jira.tmetricClientIds not set")
+		os.Exit(1)
+	}
+
 	return &Config{
-		OpenProjectUrl:                     openProjectUrl,
-		OpenProjectToken:                   openProjectToken,
-		OpenProjectTeam:                    openProjectTeam,
-		TmetricToken:                       tmetricToken,
-		ClientIdInTmetric:                  clientIdInTmetric,
+		OpenProjectUrl:              openProjectUrl,
+		OpenProjectToken:            openProjectToken,
+		OpenProjectTeam:             openProjectTeam,
+		OpenProjectTmetricClientIds: openProjectTmetricClientIds,
+		TmetricToken:                tmetricToken,
+		//ClientIdInTmetric:                  clientIdInTmetric,
 		TmetricAPIBaseUrl:                  "https://app.tmetric.com/api/",
 		TmetricAPIV3BaseUrl:                "https://app.tmetric.com/api/v3/",
 		TmetricDummyProjectId:              tmetricDummyProjectId,
@@ -77,5 +107,9 @@ func NewConfig() *Config {
 		// this value has always to be "https://community.openproject.org"
 		// otherwise tmetric does not recognize the integration and does not allow to create the external task
 		TmetricExternalTaskLink: "https://community.openproject.org/",
+		JiraUrl:                 jiraUrl,
+		JiraUser:                jiraUser,
+		JiraToken:               jiraToken,
+		JiraTmetricClientIds:    jiraTmetricClientIds,
 	}
 }

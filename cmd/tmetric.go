@@ -22,10 +22,12 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/jira"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/manifoldco/promptui"
@@ -43,18 +45,18 @@ func validateOpenProjectWorkPackage(input string) error {
 }
 
 func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
-	entriesWithoutLinkToOpenProject := tmetric.GetEntriesWithoutLinkToOpenProject(config, timeEntries)
-	if len(entriesWithoutLinkToOpenProject) > 0 {
-		fmt.Println("Some time-entries do not have any workpackages assigned")
+	entriesWithoutLink := tmetric.GetEntriesWithoutLinkToProjectManagement(config, timeEntries)
+	if len(entriesWithoutLink) > 0 {
+		fmt.Println("Some time-entries do not have any workpackage / issue assigned")
 	}
 
 	spinner := newSpinner()
 	defer spinner.Stop()
 
-	for _, entry := range entriesWithoutLinkToOpenProject {
+	for _, entry := range entriesWithoutLink {
 		getWPPrompt := promptui.Prompt{
 			Label: fmt.Sprintf(
-				"%v => %v %v-%v. Provide a WP number to be assigned to this time-entry (Enter to skip)",
+				"%v => %v %v-%v. Provide a WP number / issue ID to be assigned to this time-entry (Enter to skip)",
 				entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
 			),
 			Validate: validateOpenProjectWorkPackage,
@@ -74,7 +76,16 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 				workpackageFoundOnOpenProject = true
 				continue
 			}
-			workPackage, err := openproject.GetWorkpackage(workPackageId, config)
+			var workPackage openproject.WorkPackage
+			if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+				workPackage, err = openproject.GetWorkpackage(workPackageId, config)
+			} else if slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
+				workPackage, err = jira.GetIssue(workPackageId, config)
+			} else {
+				fmt.Println("not a Jira or OpenProject entry, skipping")
+				continue
+			}
+
 
 			if err == nil {
 				workpackageFoundOnOpenProject = true
