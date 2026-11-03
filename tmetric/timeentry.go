@@ -20,12 +20,13 @@ package tmetric
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
-	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
-	"github.com/go-resty/resty/v2"
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
+	"github.com/go-resty/resty/v2"
 )
 
 type ExternalLink struct {
@@ -193,10 +194,8 @@ this is the only way to create an external task in tmetric.
 This task is needed to have an issueId of OpenProject assigned to a time entry.
 */
 func CreateDummyTimeEntry(
-	workPackage openproject.WorkPackage, tmetricUser User, config *config.Config,
+	dummyTimeEntry DummyTimeEntry, tmetricUser User, config *config.Config,
 ) (*TimeEntry, error) {
-	dummyTimeEntry := NewDummyTimeEntry(workPackage, config.OpenProjectUrl, config.TmetricDummyProjectId)
-	dummyTimeEntry.ServiceUrl = config.TmetricExternalTaskLink
 	dummyTimerString, _ := json.Marshal(dummyTimeEntry)
 	httpClient := resty.New()
 	resp, err := httpClient.R().

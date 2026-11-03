@@ -28,7 +28,7 @@ import (
 
 type Issue struct {
 	Key    string `json:"key"`
-	Id     int    `json:"id"`
+	Id     int    `json:"string"`
 	Fields struct {
 		Summary string `json:"summary"`
 	} `json:"fields"`
