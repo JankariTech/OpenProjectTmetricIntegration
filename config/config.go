@@ -59,6 +59,15 @@ func NewConfig() *Config {
 		fmt.Fprintln(os.Stderr, "tmetric.token not set")
 		os.Exit(1)
 	}
+
+	clientIdInTmetric := viper.GetInt("tmetric.clientId")
+	if clientIdInTmetric != 0 {
+		fmt.Fprintln(
+			os.Stderr,
+			"tmetric.clientId is obsolete! Use `openproject.tmetricClientIds` and `jira.tmetricClientIds`")
+		os.Exit(1)
+	}
+
 	openProjectTmetricClientIds := viper.GetIntSlice("openproject.tmetricClientIds")
 	if len(openProjectTmetricClientIds) == 0 {
 		fmt.Fprintln(os.Stderr, "openproject.tmetricClientIds not set")
