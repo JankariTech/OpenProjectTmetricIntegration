@@ -45,11 +45,11 @@ jira:
   url: '<url of your jira instance xxx.atlassian.com>'
   user: '<email of your jira user>'
   token: <jira token>
-  tmetricClientIds: <array of t-metric clients, who's time needs to be transferred to jira>
+  tmetricClientIds: <array of t-metric clients, who's time needs to be transferred to Jira>
 openproject:
   url: 'https://community.openproject.org'
   token: <openproject token>
-  tmetricClientIds: <array of t-metric clients, who's time needs to be transferred to openproject>
+  tmetricClientIds: <array of t-metric clients, who's time needs to be transferred to OpenProject>
 tmetric:
   token: <t-metric token>
   dummyProjectId: <id of the dummy project the admin created>
