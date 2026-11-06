@@ -223,65 +223,74 @@ func GetAllTimeEntries(config *config.Config, tmetricUser User, startDate string
 	return timeEntriesOfTheSelectedClient, nil
 }
 
-func GetEntriesNotTransferredToOpenProject(timeEntries []TimeEntry, TmetricTagTransferredToOpenProject string) []TimeEntry {
+func GetEntriesNotTransferredToProjectManagement(timeEntries []TimeEntry, TmetricTagTransferredToOpenProject string, clientIdsToCheck []int) []TimeEntry {
 	var filteredEntries []TimeEntry
 	for _, entry := range timeEntries {
-		hasTransferredTag := false
-		for _, tag := range entry.Tags {
-			if tag.Name == TmetricTagTransferredToOpenProject {
-				hasTransferredTag = true
-				break
+		if clientIdsToCheck == nil || slices.Contains(clientIdsToCheck, entry.Project.Client.Id) {
+			hasTransferredTag := false
+			for _, tag := range entry.Tags {
+				if tag.Name == TmetricTagTransferredToOpenProject {
+					hasTransferredTag = true
+					break
+				}
 			}
-		}
-		if !hasTransferredTag {
-			filteredEntries = append(filteredEntries, entry)
+			if !hasTransferredTag {
+				filteredEntries = append(filteredEntries, entry)
+			}
 		}
 	}
 
 	return filteredEntries
 }
 
-func GetEntriesWithoutWorkType(timeEntries []TimeEntry) []TimeEntry {
+func GetEntriesWithoutWorkType(timeEntries []TimeEntry, clientIdsToCheck []int) []TimeEntry {
 	// get all entries that belong to the client and do not have any work-type set
 	var entriesWithoutWorkType []TimeEntry
+
 	for _, entry := range timeEntries {
-		workTypeFound := false
-		for _, tag := range entry.Tags {
-			if tag.IsWorkType {
-				workTypeFound = true
-				break
+		if clientIdsToCheck == nil || slices.Contains(clientIdsToCheck, entry.Project.Client.Id) {
+			workTypeFound := false
+			for _, tag := range entry.Tags {
+				if tag.IsWorkType {
+					workTypeFound = true
+					break
+				}
 			}
-		}
-		if !workTypeFound {
-			entriesWithoutWorkType = append(entriesWithoutWorkType, entry)
+			if !workTypeFound {
+				entriesWithoutWorkType = append(entriesWithoutWorkType, entry)
+			}
 		}
 	}
 	return entriesWithoutWorkType
 }
 
-func GetEntriesWithoutLinkToProjectManagement(config *config.Config, timeEntries []TimeEntry) []TimeEntry {
+func GetEntriesWithoutLinkToProjectManagement(config *config.Config, timeEntries []TimeEntry, clientIdsToCheck []int) []TimeEntry {
 	var entriesWithoutLink []TimeEntry
 	for _, entry := range timeEntries {
 		var err error
 		expectedLinkPrefix := ""
-		if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
-			// this check is only relevant for OpenProject associated entries
-			_, err = entry.GetIssueIdAsInt()
+		if clientIdsToCheck == nil || slices.Contains(clientIdsToCheck, entry.Project.Client.Id) {
+			if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+				// this check is only relevant for OpenProject associated entries
+				_, err = entry.GetIssueIdAsInt()
 
-			expectedLinkPrefix = config.TmetricExternalTaskLink + "work_packages"
-		} else if slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
-			expectedLinkPrefix, _ = url.JoinPath(config.JiraUrl, "browse")
-			expectedLinkPrefix += "/"
-		} else {
-			// not a Jira or OpenProject entry, skip
-			continue
+				expectedLinkPrefix = config.TmetricExternalTaskLink + "work_packages"
+			} else if slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
+				expectedLinkPrefix, _ = url.JoinPath(config.JiraUrl, "browse")
+				expectedLinkPrefix += "/"
+			} else {
+				// not a Jira or OpenProject entry, skip
+				continue
+			}
+
+			if entry.Task.Id == 0 ||
+				err != nil ||
+				entry.Task.ExternalLink.IssueId == "" ||
+				(!strings.HasPrefix(entry.Task.ExternalLink.Link, expectedLinkPrefix)) {
+				entriesWithoutLink = append(entriesWithoutLink, entry)
+			}
 		}
-		if entry.Task.Id == 0 ||
-			err != nil ||
-			entry.Task.ExternalLink.IssueId == "" ||
-			(!strings.HasPrefix(entry.Task.ExternalLink.Link, expectedLinkPrefix)) {
-			entriesWithoutLink = append(entriesWithoutLink, entry)
-		}
+
 	}
 	return entriesWithoutLink
 }

@@ -45,7 +45,7 @@ func validateOpenProjectWorkPackage(input string) error {
 }
 
 func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
-	entriesWithoutLink := tmetric.GetEntriesWithoutLinkToProjectManagement(config, timeEntries)
+	entriesWithoutLink := tmetric.GetEntriesWithoutLinkToProjectManagement(config, timeEntries, nil)
 	if len(entriesWithoutLink) > 0 {
 		fmt.Println("Some time-entries do not have any workpackage / issue assigned")
 	}
@@ -196,7 +196,7 @@ func implausibleProjectConfirmation(
 }
 
 func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
-	entriesWithoutWorkType := tmetric.GetEntriesWithoutWorkType(timeEntries)
+	entriesWithoutWorkType := tmetric.GetEntriesWithoutWorkType(timeEntries, nil)
 	for _, entry := range entriesWithoutWorkType {
 		// work-types are only relevant for OpenProject WP
 		if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {

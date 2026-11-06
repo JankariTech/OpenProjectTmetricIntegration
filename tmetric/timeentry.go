@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/jira"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/go-resty/resty/v2"
 )
@@ -272,7 +273,30 @@ func (timeEntry *TimeEntry) ConvertToOpenProjectTimeEntry(activity openproject.A
 	return opTimeEntry, err
 }
 
-func (timeEntry *TimeEntry) getParsedTime(startTime bool) (time.Time, error) {
+func (timeEntry *TimeEntry) ConvertToJiraWorklog(timezone string) (jira.Worklog, error) {
+	duration, err := timeEntry.GetDuration()
+	if err != nil {
+		return jira.Worklog{}, err
+	}
+	started, err := timeEntry.getParsedTime(true, timezone)
+	if err != nil {
+		return jira.Worklog{}, err
+	}
+	return jira.Worklog{
+		Key: timeEntry.Task.ExternalLink.IssueId,
+		Comment: jira.Comment{
+			Type:    "doc",
+			Version: 1,
+			Content: []jira.CommentNode{
+				{Type: "text", Text: timeEntry.Note},
+			},
+		},
+		Started:          started.Format("2006-01-02T15:04:05.000-0700"),
+		TimeSpentSeconds: int(duration.Seconds()),
+	}, nil
+}
+
+func (timeEntry *TimeEntry) getParsedTime(startTime bool, timezone string) (time.Time, error) {
 	stringToParse := ""
 	if startTime {
 		stringToParse = timeEntry.StartTime
@@ -280,7 +304,11 @@ func (timeEntry *TimeEntry) getParsedTime(startTime bool) (time.Time, error) {
 		stringToParse = timeEntry.EndTime
 	}
 
-	timeParsed, err := time.Parse("2006-01-02T15:04:05", stringToParse)
+	if timezone == "" {
+		timezone = "UTC"
+	}
+	loc, _ := time.LoadLocation(timezone)
+	timeParsed, err := time.ParseInLocation("2006-01-02T15:04:05", stringToParse, loc)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse time: %v", err)
 	}
@@ -288,11 +316,11 @@ func (timeEntry *TimeEntry) getParsedTime(startTime bool) (time.Time, error) {
 }
 
 func (timeEntry *TimeEntry) GetDuration() (time.Duration, error) {
-	startTimeParsed, err := timeEntry.getParsedTime(true)
+	startTimeParsed, err := timeEntry.getParsedTime(true, "")
 	if err != nil {
 		return 0, err
 	}
-	endTimeParsed, err := timeEntry.getParsedTime(false)
+	endTimeParsed, err := timeEntry.getParsedTime(false, "")
 	if err != nil {
 		return 0, err
 	}
@@ -317,7 +345,7 @@ func (timeEntry *TimeEntry) GetIso8601Duration() (string, string, error) {
 		int(duration.Minutes())%60,
 		int(duration.Seconds())%60,
 	)
-	startTimeParsed, err := timeEntry.getParsedTime(true)
+	startTimeParsed, err := timeEntry.getParsedTime(true, "")
 	if err != nil {
 		return "", "", err
 	}
