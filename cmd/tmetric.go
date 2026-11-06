@@ -22,10 +22,12 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/jira"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/manifoldco/promptui"
@@ -43,25 +45,25 @@ func validateOpenProjectWorkPackage(input string) error {
 }
 
 func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
-	entriesWithoutLinkToOpenProject := tmetric.GetEntriesWithoutLinkToOpenProject(config, timeEntries)
-	if len(entriesWithoutLinkToOpenProject) > 0 {
-		fmt.Println("Some time-entries do not have any workpackages assigned")
+	entriesWithoutLink := tmetric.GetEntriesWithoutLinkToProjectManagement(config, timeEntries)
+	if len(entriesWithoutLink) > 0 {
+		fmt.Println("Some time-entries do not have any workpackage / issue assigned")
 	}
 
 	spinner := newSpinner()
 	defer spinner.Stop()
 
-	for _, entry := range entriesWithoutLinkToOpenProject {
+	for _, entry := range entriesWithoutLink {
 		getWPPrompt := promptui.Prompt{
 			Label: fmt.Sprintf(
-				"%v => %v %v-%v. Provide a WP number to be assigned to this time-entry (Enter to skip)",
+				"%v => %v %v-%v. Provide a WP number / issue ID to be assigned to this time-entry (Enter to skip)",
 				entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
 			),
 			Validate: validateOpenProjectWorkPackage,
 		}
 
-		workpackageFoundOnOpenProject := false
-		for !workpackageFoundOnOpenProject {
+		foundInProjectManagement := false
+		for !foundInProjectManagement {
 
 			workPackageId, err := getWPPrompt.Run()
 
@@ -71,51 +73,84 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 
 			if workPackageId == "" {
 				fmt.Println("skipping")
-				workpackageFoundOnOpenProject = true
+				foundInProjectManagement = true
 				continue
 			}
-			workPackage, err := openproject.GetWorkpackage(workPackageId, config)
 
-			if err == nil {
-				workpackageFoundOnOpenProject = true
+			dummyTimeEntry := tmetric.DummyTimeEntry{
+				IsStarted:   true,
+				ShowIssueId: true,
+				Duration:    0,
+
+				Description: "to-delete-only-created-to-create-an-external-task",
+				ProjectId:   config.TmetricDummyProjectId,
+			}
+
+			if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+				workPackage, err := openproject.GetWorkpackage(workPackageId, config)
+				if err == nil {
+					foundInProjectManagement = true
+				} else {
+					fmt.Printf("%v\n", err)
+					continue
+				}
+				if !implausibleProjectConfirmation(
+					workPackage,
+					workPackage.Embedded.Project.Active,
+					"This project is NOT active! ",
+					"Do you want to use a WP from an INACTIVE project?",
+				) {
+					foundInProjectManagement = false
+					continue
+				}
+
+				if !implausibleProjectConfirmation(
+					workPackage,
+					workPackage.Embedded.Project.Favorited,
+					"This project is none of your favorite projects!",
+					"Do you really want to use a WP from a not-favorite project?",
+				) {
+					foundInProjectManagement = false
+					continue
+				}
+
+				if !implausibleProjectConfirmation(
+					workPackage,
+					workPackage.Embedded.Assignee.Name == tmetricUser.Name || workPackage.Embedded.Assignee.Name == config.OpenProjectTeam,
+					fmt.Sprintf("This WP is not assigned to you but to '%s'!", workPackage.Embedded.Assignee.Name),
+					"Do you really want to use a WP that is not assigned to you?",
+				) {
+					foundInProjectManagement = false
+					continue
+				}
+				dummyTimeEntry.IssueId = fmt.Sprintf("#%v", workPackage.Id)
+				dummyTimeEntry.IssueName = workPackage.Subject
+				dummyTimeEntry.IssueUrl = fmt.Sprintf("/work_packages/%v", workPackage.Id)
+				dummyTimeEntry.ServiceUrl = config.OpenProjectUrl
+				dummyTimeEntry.ServiceType = "OpenProject"
+			} else if slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
+				issue, err := jira.GetIssue(workPackageId, config)
+
+				if err == nil {
+					foundInProjectManagement = true
+				} else {
+					fmt.Printf("%v\n", err)
+					continue
+				}
+
+				dummyTimeEntry.IssueId = issue.Key
+				dummyTimeEntry.IssueName = issue.Fields.Summary
+				dummyTimeEntry.IssueUrl = fmt.Sprintf("/browse/%v", issue.Key)
+				dummyTimeEntry.ServiceUrl = config.JiraUrl
 			} else {
-				fmt.Printf("%v\n", err)
-				continue
-			}
-
-			if !implausibleProjectConfirmation(
-				workPackage,
-				workPackage.Embedded.Project.Active,
-				"This project is NOT active! ",
-				"Do you want to use a WP from an INACTIVE project?",
-			) {
-				workpackageFoundOnOpenProject = false
-				continue
-			}
-
-			if !implausibleProjectConfirmation(
-				workPackage,
-				workPackage.Embedded.Project.Favorited,
-				"This project is none of your favorite projects!",
-				"Do you really want to use a WP from a not-favorite project?",
-			) {
-				workpackageFoundOnOpenProject = false
-				continue
-			}
-
-			if !implausibleProjectConfirmation(
-				workPackage,
-				workPackage.Embedded.Assignee.Name == tmetricUser.Name || workPackage.Embedded.Assignee.Name == config.OpenProjectTeam,
-				fmt.Sprintf("This WP is not assigned to you but to '%s'!", workPackage.Embedded.Assignee.Name),
-				"Do you really want to use a WP that is not assigned to you?",
-			) {
-				workpackageFoundOnOpenProject = false
+				fmt.Println("not a Jira or OpenProject entry, skipping")
 				continue
 			}
 
 			prompt := promptui.Prompt{
 				Label: fmt.Sprintf(
-					"WP: %v. Subject: %v. Update t-metric entry?", workPackage.Id, workPackage.Subject,
+					"WP/Issue: %v. Subject: %v. Update t-metric entry?",
+					dummyTimeEntry.IssueId, dummyTimeEntry.IssueName,
 				),
 				IsConfirm: true,
 			}
@@ -125,7 +160,7 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 				spinner.Start()
 				spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
 				spinner.FinalMSG = "❌\n"
-				latestTimeEntry, err := tmetric.CreateDummyTimeEntry(workPackage, tmetricUser, config)
+				latestTimeEntry, err := tmetric.CreateDummyTimeEntry(dummyTimeEntry, tmetricUser, config)
 				if err != nil {
 					return err
 				}
@@ -162,64 +197,73 @@ func implausibleProjectConfirmation(
 
 func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
 	entriesWithoutWorkType := tmetric.GetEntriesWithoutWorkType(timeEntries)
-	if len(entriesWithoutWorkType) > 0 {
-		fmt.Println("Some time-entries do not have any work type assigned")
+	for _, entry := range entriesWithoutWorkType {
+		// work-types are only relevant for OpenProject WP
+		if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+			fmt.Println("Some time-entries do not have any work type assigned")
+			break
+		}
+
 	}
 
 	spinner := newSpinner()
 	defer spinner.Stop()
 	for _, entry := range entriesWithoutWorkType {
-		possibleWorkTypes, err := entry.GetPossibleWorkTypes(*config, tmetricUser)
+		// work-types are only relevant for OpenProject WP
+		if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+			possibleWorkTypes, err := entry.GetPossibleWorkTypes(*config, tmetricUser)
 
-		if err != nil {
-			return err
-		}
-
-		if len(possibleWorkTypes) == 0 {
-			return fmt.Errorf("could not find any work types for project %v", entry.Project.Name)
-		}
-
-		var promptItems []string
-		for _, workType := range possibleWorkTypes {
-			promptItems = append(promptItems, workType.Name)
-		}
-		promptItems = append(promptItems, "skip")
-		promptSelectWorkType := promptui.Select{
-			Label: fmt.Sprintf(
-				"%v => %v %v-%v. Select work-type",
-				entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
-			),
-			Items: promptItems,
-		}
-		_, workType, err := promptSelectWorkType.Run()
-		if err != nil {
-			return fmt.Errorf("prompt failed: %v", err)
-		}
-		if workType == "skip" {
-			fmt.Println("skipping")
-			continue
-		}
-
-		promptConfirm := promptui.Prompt{
-			Label: fmt.Sprintf(
-				"Work-type: %v. Update t-metric entry", workType,
-			),
-			IsConfirm: true,
-		}
-		updateTmetricConfirmation, err := promptConfirm.Run()
-		if strings.ToLower(updateTmetricConfirmation) == "y" {
-			entry.Tags = append(entry.Tags, tmetric.Tag{Name: workType, IsWorkType: true})
-			spinner.Start()
-			spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
-			spinner.FinalMSG = "❌\n"
-
-			err = entry.Update(*config, tmetricUser)
 			if err != nil {
 				return err
 			}
-			spinner.FinalMSG = "✔️\n"
-			spinner.Stop()
+
+			if len(possibleWorkTypes) == 0 {
+				return fmt.Errorf("could not find any work types for project %v", entry.Project.Name)
+			}
+
+			var promptItems []string
+			for _, workType := range possibleWorkTypes {
+				promptItems = append(promptItems, workType.Name)
+			}
+			promptItems = append(promptItems, "skip")
+			promptSelectWorkType := promptui.Select{
+				Label: fmt.Sprintf(
+					"%v => %v %v-%v. Select work-type",
+					entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
+				),
+				Items: promptItems,
+			}
+			_, workType, err := promptSelectWorkType.Run()
+			if err != nil {
+				return fmt.Errorf("prompt failed: %v", err)
+			}
+			if workType == "skip" {
+				fmt.Println("skipping")
+				continue
+			}
+
+			promptConfirm := promptui.Prompt{
+				Label: fmt.Sprintf(
+					"Work-type: %v. Update t-metric entry", workType,
+				),
+				IsConfirm: true,
+			}
+			updateTmetricConfirmation, err := promptConfirm.Run()
+			if strings.ToLower(updateTmetricConfirmation) == "y" {
+				entry.Tags = append(entry.Tags, tmetric.Tag{Name: workType, IsWorkType: true})
+				spinner.Start()
+				spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
+				spinner.FinalMSG = "❌\n"
+
+				err = entry.Update(*config, tmetricUser)
+				if err != nil {
+					return err
+				}
+				spinner.FinalMSG = "✔️\n"
+				spinner.Stop()
+			}
 		}
+
 	}
 	return nil
 }
@@ -254,7 +298,7 @@ var tmetricCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// after and update time entries receive a new id, so we need to fetch them again
+		// after an update time entries receive a new id, so we need to fetch them again
 		timeEntries, err = tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
