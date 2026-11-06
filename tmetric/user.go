@@ -20,16 +20,20 @@ package tmetric
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
-	"github.com/go-resty/resty/v2"
 	"os"
 	"regexp"
+
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/go-resty/resty/v2"
 )
 
 type User struct {
 	Id              int    `json:"id"`
 	Name            string `json:"name"`
 	ActiveAccountId int    `json:"activeAccountId"`
+	TimeZone        struct {
+		Id string `json:"id"`
+	} `json:"timeZone"`
 }
 
 // UserV2 API V2 has a different structure for the user, see:
