@@ -30,7 +30,6 @@ type Config struct {
 	OpenProjectTeam                    string
 	OpenProjectTmetricClientIds        []int
 	TmetricToken                       string
-	ClientIdInTmetric                  int
 	TmetricAPIBaseUrl                  string
 	TmetricAPIV3BaseUrl                string
 	TmetricDummyProjectId              int
@@ -91,8 +90,8 @@ func NewConfig() *Config {
 		errorMessage = "tmetric.token not set"
 	}
 
-	config.ClientIdInTmetric = viper.GetInt("tmetric.clientId")
-	if config.ClientIdInTmetric != 0 {
+	clientIdInTmetric := viper.GetInt("tmetric.clientId")
+	if clientIdInTmetric != 0 {
 		errorMessage =
 			"tmetric.clientId is obsolete! Use `openproject.tmetricClientIds` and `jira.tmetricClientIds`"
 	}

@@ -20,16 +20,20 @@ package tmetric
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
-	"github.com/go-resty/resty/v2"
 	"os"
 	"regexp"
+
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/go-resty/resty/v2"
 )
 
 type User struct {
 	Id              int    `json:"id"`
 	Name            string `json:"name"`
 	ActiveAccountId int    `json:"activeAccountId"`
+	TimeZone        struct {
+		Id string `json:"id"`
+	} `json:"timeZone"`
 }
 
 // UserV2 API V2 has a different structure for the user, see:
@@ -41,6 +45,9 @@ type UserV2 struct {
 		UserProfileId   int    `json:"userProfileId"`
 		ActiveAccountId int    `json:"activeAccountId"`
 		UserName        string `json:"userName"`
+		TimeZone        struct {
+			Id string `json:"id"`
+		} `json:"timeZoneInfo"`
 	} `json:"userProfile"`
 	AccountMemberScope struct {
 		GroupMembership []struct {
@@ -101,6 +108,9 @@ func FindUserByName(config *config.Config, userMe User, search string) (User, er
 				Id:              user.UserProfile.UserProfileId,
 				Name:            user.UserProfile.UserName,
 				ActiveAccountId: user.UserProfile.ActiveAccountId,
+				TimeZone: struct {
+					Id string `json:"id"`
+				}{Id: user.UserProfile.TimeZone.Id},
 			}, nil
 		}
 	}
