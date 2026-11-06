@@ -43,82 +43,76 @@ type Config struct {
 }
 
 func NewConfig() *Config {
-	openProjectUrl := viper.GetString("openproject.url")
-	if openProjectUrl == "" {
-		fmt.Fprintln(os.Stderr, "openproject.url not set")
-		os.Exit(1)
+	config := &Config{}
+	errorMessage := ""
+	openproject := viper.Sub("openproject")
+	if openproject != nil {
+		config.OpenProjectUrl = openproject.GetString("url")
+		if config.OpenProjectUrl == "" {
+			errorMessage = "openproject.url not set"
+		}
+		config.OpenProjectToken = openproject.GetString("token")
+		if config.OpenProjectToken == "" {
+			errorMessage = "openproject.token not set"
+		}
+		config.OpenProjectTeam = openproject.GetString("team")
+		config.OpenProjectTmetricClientIds = openproject.GetIntSlice("tmetricClientIds")
+		if len(config.OpenProjectTmetricClientIds) == 0 {
+			errorMessage = "openproject.tmetricClientIds not set"
+		}
 	}
-	openProjectToken := viper.GetString("openproject.token")
-	if openProjectToken == "" {
-		fmt.Fprintln(os.Stderr, "openproject.token not set")
-		os.Exit(1)
+
+	jira := viper.Sub("jira")
+	if jira != nil {
+		config.JiraUrl = jira.GetString("url")
+		if config.JiraUrl == "" {
+			errorMessage = "jira.url not set"
+		}
+		config.JiraUser = jira.GetString("user")
+		if config.JiraUser == "" {
+			errorMessage = "jira.user not set"
+		}
+		config.JiraToken = jira.GetString("token")
+		if config.JiraToken == "" {
+			errorMessage = "jira.token not set"
+		}
+		config.JiraTmetricClientIds = jira.GetIntSlice("tmetricClientIds")
+		if len(config.JiraTmetricClientIds) == 0 {
+			errorMessage = "jira.tmetricClientIds not set"
+		}
 	}
-	openProjectTeam := viper.GetString("openproject.team")
-	tmetricToken := viper.GetString("tmetric.token")
-	if tmetricToken == "" {
-		fmt.Fprintln(os.Stderr, "tmetric.token not set")
+
+	if jira == nil && openproject == nil {
+		errorMessage = "neither jira nor openproject settings are set"
+	}
+
+	config.TmetricToken = viper.GetString("tmetric.token")
+	if config.TmetricToken == "" {
+		errorMessage = "tmetric.token not set"
+	}
+
+	config.ClientIdInTmetric = viper.GetInt("tmetric.clientId")
+	if config.ClientIdInTmetric != 0 {
+		errorMessage =
+			"tmetric.clientId is obsolete! Use `openproject.tmetricClientIds` and `jira.tmetricClientIds`"
+	}
+
+	config.TmetricDummyProjectId = viper.GetInt("tmetric.dummyProjectId")
+	if config.TmetricDummyProjectId == 0 {
+		errorMessage = "tmetric.dummyProjectId not set"
+	}
+
+	if errorMessage != "" {
+		_, _ = fmt.Fprintln(os.Stderr, errorMessage)
 		os.Exit(1)
 	}
 
-	clientIdInTmetric := viper.GetInt("tmetric.clientId")
-	if clientIdInTmetric != 0 {
-		fmt.Fprintln(
-			os.Stderr,
-			"tmetric.clientId is obsolete! Use `openproject.tmetricClientIds` and `jira.tmetricClientIds`")
-		os.Exit(1)
-	}
+	config.TmetricAPIBaseUrl = "https://app.tmetric.com/api/"
+	config.TmetricAPIV3BaseUrl = "https://app.tmetric.com/api/v3/"
+	config.TmetricTagTransferredToOpenProject = "transferred-to-openproject"
+	// this value has always to be "https://community.openproject.org"
+	// otherwise tmetric does not recognize the integration and does not allow to create the external task
+	config.TmetricExternalTaskLink = "https://community.openproject.org/"
 
-	openProjectTmetricClientIds := viper.GetIntSlice("openproject.tmetricClientIds")
-	if len(openProjectTmetricClientIds) == 0 {
-		fmt.Fprintln(os.Stderr, "openproject.tmetricClientIds not set")
-		os.Exit(1)
-	}
-
-	tmetricDummyProjectId := viper.GetInt("tmetric.dummyProjectId")
-	if tmetricDummyProjectId == 0 {
-		fmt.Fprintln(os.Stderr, "tmetric.dummyProjectId not set")
-		os.Exit(1)
-	}
-
-	jiraUrl := viper.GetString("jira.url")
-	if jiraUrl == "" {
-		fmt.Fprintln(os.Stderr, "jira.url not set")
-		os.Exit(1)
-	}
-	jiraUser := viper.GetString("jira.user")
-	if jiraUser == "" {
-		fmt.Fprintln(os.Stderr, "jira.user not set")
-		os.Exit(1)
-	}
-	jiraToken := viper.GetString("jira.token")
-	if jiraToken == "" {
-		fmt.Fprintln(os.Stderr, "jira.token not set")
-		os.Exit(1)
-	}
-
-	jiraTmetricClientIds := viper.GetIntSlice("jira.tmetricClientIds")
-	if len(jiraTmetricClientIds) == 0 {
-		fmt.Fprintln(os.Stderr, "jira.tmetricClientIds not set")
-		os.Exit(1)
-	}
-
-	return &Config{
-		OpenProjectUrl:              openProjectUrl,
-		OpenProjectToken:            openProjectToken,
-		OpenProjectTeam:             openProjectTeam,
-		OpenProjectTmetricClientIds: openProjectTmetricClientIds,
-		TmetricToken:                tmetricToken,
-		//ClientIdInTmetric:                  clientIdInTmetric,
-		TmetricAPIBaseUrl:                  "https://app.tmetric.com/api/",
-		TmetricAPIV3BaseUrl:                "https://app.tmetric.com/api/v3/",
-		TmetricDummyProjectId:              tmetricDummyProjectId,
-		TmetricTagTransferredToOpenProject: "transferred-to-openproject",
-		// this value has always to be "https://community.openproject.org"
-		// otherwise tmetric does not recognize the integration and does not allow to create the external task
-		TmetricExternalTaskLink: "https://community.openproject.org/",
-		JiraUrl:                 jiraUrl,
-		JiraUser:                jiraUser,
-		JiraToken:               jiraToken,
-		JiraTmetricClientIds:    jiraTmetricClientIds,
-	}
+	return config
 }
