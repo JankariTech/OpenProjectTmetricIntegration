@@ -271,6 +271,7 @@ func GetEntriesWithoutLinkToProjectManagement(config *config.Config, timeEntries
 			expectedLinkPrefix = config.TmetricExternalTaskLink + "work_packages"
 		} else if slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
 			expectedLinkPrefix, _ = url.JoinPath(config.JiraUrl, "browse")
+			expectedLinkPrefix += "/"
 		} else {
 			// not a Jira or OpenProject entry, skip
 			continue
