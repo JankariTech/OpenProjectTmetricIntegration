@@ -1,11 +1,12 @@
 package tmetric
 
 import (
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 )
 
 func Test_GetEntriesWithoutLinkToOpenProject(t *testing.T) {
@@ -25,7 +26,7 @@ func Test_GetEntriesWithoutLinkToOpenProject(t *testing.T) {
 			},
 		},
 		{
-			name: "link is not to openproject",
+			name: "link is not to openproject nor jira",
 			task: Task{
 				Id:   345,
 				Name: "some WP",
@@ -60,13 +61,15 @@ func Test_GetEntriesWithoutLinkToOpenProject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// adds a correct entry at the beginning and the end and makes sure the invalid
-			// entry is still in the result
+			// adds a correct openproject entry at the beginning and a jira entry at the end
+			// and makes sure the invalid entry is still in the result
 			config := &config.Config{
-				ClientIdInTmetric:       123,
-				TmetricExternalTaskLink: "https://community.openproject.org/",
+				OpenProjectTmetricClientIds: []int{123},
+				JiraTmetricClientIds:        []int{789},
+				JiraUrl:                     "https://jankaritech.atlassian.net",
+				TmetricExternalTaskLink:     "https://community.openproject.org/",
 			}
-			validTimeEntry := TimeEntry{
+			validOpenProjectTimeEntry := TimeEntry{
 				Project: Project{
 					Client: Client{Id: 123},
 					Name:   "Project1",
@@ -81,6 +84,21 @@ func Test_GetEntriesWithoutLinkToOpenProject(t *testing.T) {
 					},
 				},
 			}
+			validJiraTimeEntry := TimeEntry{
+				Project: Project{
+					Client: Client{Id: 789},
+					Name:   "Project1",
+				},
+				Note: "correct entry",
+				Task: Task{
+					Id:   345,
+					Name: "some WP",
+					ExternalLink: ExternalLink{
+						Link:    "https://jankaritech.atlassian.net/browse/JT-123",
+						IssueId: "JT-123",
+					},
+				},
+			}
 			invalidTimeEntry := TimeEntry{
 				Project: Project{
 					Client: Client{Id: 123},
@@ -89,9 +107,9 @@ func Test_GetEntriesWithoutLinkToOpenProject(t *testing.T) {
 				Note: "invalid entry",
 				Task: tt.task,
 			}
-			timeEntriesToCheck := append([]TimeEntry{invalidTimeEntry}, validTimeEntry)
-			timeEntriesToCheck = append([]TimeEntry{validTimeEntry}, timeEntriesToCheck...)
-			result := GetEntriesWithoutLinkToOpenProject(config, timeEntriesToCheck)
+			timeEntriesToCheck := append([]TimeEntry{invalidTimeEntry}, validOpenProjectTimeEntry)
+			timeEntriesToCheck = append([]TimeEntry{validJiraTimeEntry}, timeEntriesToCheck...)
+			result := GetEntriesWithoutLinkToProjectManagement(config, timeEntriesToCheck)
 			if !reflect.DeepEqual(result, []TimeEntry{invalidTimeEntry}) {
 				t.Errorf("got %v, want %v", result, []TimeEntry{invalidTimeEntry})
 			}

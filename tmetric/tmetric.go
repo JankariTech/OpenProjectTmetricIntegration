@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -210,7 +211,8 @@ func GetAllTimeEntries(config *config.Config, tmetricUser User, startDate string
 
 	var timeEntriesOfTheSelectedClient []TimeEntry
 	for _, entry := range timeEntries {
-		if entry.Project.Client.Id == config.ClientIdInTmetric {
+		if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) ||
+			slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
 			timeEntriesOfTheSelectedClient = append(timeEntriesOfTheSelectedClient, entry)
 		}
 	}
@@ -257,14 +259,27 @@ func GetEntriesWithoutWorkType(timeEntries []TimeEntry) []TimeEntry {
 	return entriesWithoutWorkType
 }
 
-func GetEntriesWithoutLinkToOpenProject(config *config.Config, timeEntries []TimeEntry) []TimeEntry {
+func GetEntriesWithoutLinkToProjectManagement(config *config.Config, timeEntries []TimeEntry) []TimeEntry {
 	var entriesWithoutLink []TimeEntry
 	for _, entry := range timeEntries {
-		_, err := entry.GetIssueIdAsInt()
+		var err error
+		expectedLinkPrefix := ""
+		if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+			// this check is only relevant for OpenProject associated entries
+			_, err = entry.GetIssueIdAsInt()
+
+			expectedLinkPrefix = config.TmetricExternalTaskLink + "work_packages"
+		} else if slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
+			expectedLinkPrefix, _ = url.JoinPath(config.JiraUrl, "browse")
+			expectedLinkPrefix += "/"
+		} else {
+			// not a Jira or OpenProject entry, skip
+			continue
+		}
 		if entry.Task.Id == 0 ||
 			err != nil ||
 			entry.Task.ExternalLink.IssueId == "" ||
-			(!strings.HasPrefix(entry.Task.ExternalLink.Link, config.TmetricExternalTaskLink+"work_packages")) {
+			(!strings.HasPrefix(entry.Task.ExternalLink.Link, expectedLinkPrefix)) {
 			entriesWithoutLink = append(entriesWithoutLink, entry)
 		}
 	}

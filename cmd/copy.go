@@ -19,13 +19,14 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/spf13/cobra"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 func checkTmetricEntries(tmetricUser tmetric.User, config *config.Config) ([]tmetric.TimeEntry, error) {
@@ -44,7 +45,7 @@ func checkTmetricEntries(tmetricUser tmetric.User, config *config.Config) ([]tme
 		)
 	}
 
-	if len(tmetric.GetEntriesWithoutLinkToOpenProject(config, timeEntries)) > 0 {
+	if len(tmetric.GetEntriesWithoutLinkToProjectManagement(config, timeEntries)) > 0 {
 		return nil, fmt.Errorf(
 			"some time-entries are not linked to an OpenProject work-package, run the 'check tmetric' command to fix it",
 		)
