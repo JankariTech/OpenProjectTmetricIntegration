@@ -210,7 +210,9 @@ var diffCmd = &cobra.Command{
 						if err != nil {
 							row.Warnings += "could not retrieve issue from JIRA"
 						}
-						jiraIssueCache[entry.IssueId] = issue
+						if err == nil {
+							jiraIssueCache[entry.IssueId] = issue
+						}
 					}
 
 					tmetricUserOfWorklog := fmt.Sprintf("- tmetric User: %v", entry.Tmetric.UserDisplayName)
