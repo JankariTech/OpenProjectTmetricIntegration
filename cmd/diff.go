@@ -232,6 +232,7 @@ var diffCmd = &cobra.Command{
 					sumDurationProjectManagement += timeSpendMinutes
 					humanReadableDuration := fmt.Sprintf("%02d:%02d", int(math.Floor(float64(timeSpendMinutes/60))), int(timeSpendMinutes)%60)
 					row.ProjectManagementDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
+					row.Warnings += "\n\n\n\n\n\n"
 				}
 			}
 
