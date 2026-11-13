@@ -31,6 +31,10 @@ type Issue struct {
 	Id     int    `json:"string"`
 	Fields struct {
 		Summary string `json:"summary"`
+		Project struct {
+			Key  string `json:"key"`
+			Name string `json:"name"`
+		} `json:"project"`
 	} `json:"fields"`
 }
 
