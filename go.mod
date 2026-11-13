@@ -8,7 +8,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/briandowns/spinner v1.23.2
 	github.com/go-chrono/chrono v0.0.0-20250504201628-03217191950b
-	github.com/go-resty/resty/v2 v2.16.5
+	github.com/go-resty/resty/v2 v2.17.2
 	github.com/jedib0t/go-pretty/v6 v6.6.8
 	github.com/manifoldco/promptui v0.9.0
 	github.com/spf13/cobra v1.10.1
