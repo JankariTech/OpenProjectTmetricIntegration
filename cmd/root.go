@@ -37,6 +37,7 @@ var exportDate string
 var userNameFromCmd string
 var cfg *config.Config
 var tmetricUser tmetric.User
+var tmetricActor tmetric.User
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -46,6 +47,7 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cfg = config.NewConfig()
 		tmetricUserMe := tmetric.NewUser()
+		tmetricActor = tmetricUserMe
 		var err error
 		if userNameFromCmd == "" {
 			tmetricUser = tmetricUserMe
