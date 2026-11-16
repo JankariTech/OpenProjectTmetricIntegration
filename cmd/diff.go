@@ -19,13 +19,16 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/jira"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -35,13 +38,13 @@ import (
 )
 
 type tableRow struct {
-	Date                string
-	TmetricEntry        string
-	TmetricDuration     string
-	OpenProjectEntry    string
-	OpenProjectDuration string
-	DiffInTime          string
-	Warnings            string
+	Date                      string
+	TmetricEntry              string
+	TmetricDuration           string
+	ProjectManagementEntry    string
+	ProjectManagementDuration string
+	DiffInTime                string
+	Warnings                  string
 }
 
 var widthOfFixedColumns = 61 // rough combined size of all columns that have a fixed width
@@ -101,29 +104,41 @@ var diffCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		var openProjectUser openproject.User
-		if userNameFromCmd != "" {
-			var err error
-			openProjectUser, err = openproject.FindUserByName(config, userNameFromCmd)
+		var openProjectTimeEntries []openproject.TimeEntry
+		if config.OpenProjectUrl != "" {
+			var openProjectUser openproject.User
+			if userNameFromCmd != "" {
+				var err error
+				openProjectUser, err = openproject.FindUserByName(config, userNameFromCmd)
+				if err != nil {
+					_, _ = fmt.Fprint(os.Stderr, err)
+					os.Exit(1)
+				}
+			}
+			openProjectTimeEntries, err = openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate, nil)
 			if err != nil {
 				_, _ = fmt.Fprint(os.Stderr, err)
 				os.Exit(1)
 			}
 		}
 
-		openProjectTimeEntries, err := openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate, nil)
-		if err != nil {
-			_, _ = fmt.Fprint(os.Stderr, err)
-			os.Exit(1)
+		var jiraWorklogs []jira.Worklog
+		if config.JiraUrl != "" {
+			jiraWorklogs, err = jira.GetAllWorklogs(config, tmetricUser.Name, startDate, endDate, tmetricUser.TimeZone.Id)
+			if err != nil {
+				_, _ = fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
 		}
 
+		jiraIssueCache := make(map[string]jira.Issue)
 		start, _ := time.Parse("2006-01-02", startDate)
 		end, _ := time.Parse("2006-01-02", endDate)
 		outputTable := table.NewWriter()
 		outputTable.SetOutputMirror(os.Stdout)
 
 		outputTable.AppendHeader(
-			table.Row{"date", "tmetric entry", "tm\ndur", "OpenProject entry", "OP\ndur", "time\ndiff", "warnings"},
+			table.Row{"date", "tmetric entry", "tm\ndur", "Project Management entry", "PM\ndur", "time\ndiff", "warnings"},
 		)
 		widthContentColumns := int((getTerminalWidth() - widthOfFixedColumns) / 2)
 		outputTable.SetColumnConfigs([]table.ColumnConfig{
@@ -132,6 +147,13 @@ var diffCmd = &cobra.Command{
 		})
 
 		totalTimeDiff := 0
+		var timezone string
+		if tmetricUser.TimeZone.Id == "" {
+			timezone = "UTC"
+		} else {
+			timezone = tmetricUser.TimeZone.Id
+		}
+		loc, _ := time.LoadLocation(timezone)
 		for currentDay := start; !currentDay.After(end); currentDay = currentDay.AddDate(0, 0, 1) {
 			spinner.Stop()
 			spinner.Suffix = fmt.Sprintf(" %s", currentDay.Format("2006-01-02"))
@@ -142,19 +164,31 @@ var diffCmd = &cobra.Command{
 			for _, entry := range tmetricTimeEntries {
 				entryDate, _ := time.Parse("2006-01-02", entry.StartTime[:10])
 				if entryDate.Equal(currentDay) {
-					workType, _ := entry.GetWorkType()
 					description := fmt.Sprintf("Description: %v", entry.Note)
 					project := fmt.Sprintf("- Project: %v", entry.Project.Name)
-					wpId := fmt.Sprintf("- WP ID: %v", entry.Task.ExternalLink.IssueId)
-					wp := fmt.Sprintf("- WP: %v", entry.Task.Name)
-					workType = fmt.Sprintf("- Work Type: %v", workType)
+					var workPackageNaming string
+					var externalTaskIdNaming string
+					var extraInformation string
+					if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+						workPackageNaming = "WP"
+						externalTaskIdNaming = "WP ID"
+						workType, _ := entry.GetWorkType()
+						extraInformation = fmt.Sprintf("- Work Type: %v", workType)
+					} else if slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
+						workPackageNaming = "Summary"
+						externalTaskIdNaming = "Issue Key"
+						extraInformation = fmt.Sprintf("- tmetric User: %v", tmetricUser.Name)
+					}
+					externalTaskId := fmt.Sprintf("- %s: %v", externalTaskIdNaming, entry.Task.ExternalLink.IssueId)
+					externalTaskName := fmt.Sprintf("- %s: %v", workPackageNaming, entry.Task.Name)
+
 					row.TmetricEntry += fmt.Sprintf(
 						"%v\n%v\n%v\n%v\n%v\n\n",
 						text.Snip(description, widthContentColumns, "~"),
 						text.Snip(project, widthContentColumns, "~"),
-						text.Snip(wpId, widthContentColumns, "~"),
-						text.Snip(wp, widthContentColumns, "~"),
-						text.Snip(workType, widthContentColumns, "~"),
+						text.Snip(externalTaskId, widthContentColumns, "~"),
+						text.Snip(externalTaskName, widthContentColumns, "~"),
+						text.Snip(extraInformation, widthContentColumns, "~"),
 					)
 					duration, _ := entry.GetDuration()
 					sumDurationTmetric += int(duration.Minutes())
@@ -163,7 +197,45 @@ var diffCmd = &cobra.Command{
 					row.TmetricDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
 				}
 			}
-			sumDurationOpenProject := 0
+			sumDurationProjectManagement := 0
+			for _, entry := range jiraWorklogs {
+				entryDate, _ := time.Parse("2006-01-02T15:04:05.000-0700", entry.Started)
+				if entryDate.In(loc).Year() == currentDay.Year() && entryDate.In(loc).Month() == currentDay.Month() && entryDate.In(loc).Day() == currentDay.Day() {
+					comment := fmt.Sprintf("Comment: %v", entry.TextComment)
+					var issue jira.Issue
+					if cacheEntry, ok := jiraIssueCache[entry.IssueId]; ok {
+						issue = cacheEntry
+					} else {
+						issue, err = jira.GetIssue(entry.IssueId, config)
+						if err != nil {
+							row.Warnings += "could not retrieve issue from JIRA"
+						}
+						if err == nil {
+							jiraIssueCache[entry.IssueId] = issue
+						}
+					}
+
+					tmetricUserOfWorklog := fmt.Sprintf("- tmetric User: %v", entry.Tmetric.UserDisplayName)
+					issueKey := fmt.Sprintf("- Issue Key: %v", issue.Key)
+					project := fmt.Sprintf("- Project: %v", issue.Fields.Project.Name)
+					summary := fmt.Sprintf("- Summary: %v", issue.Fields.Summary)
+
+					row.ProjectManagementEntry += fmt.Sprintf(
+						"%v\n%v\n%v\n%v\n%v\n\n",
+						text.Snip(comment, widthContentColumns, "~"),
+						text.Snip(project, widthContentColumns, "~"),
+						text.Snip(issueKey, widthContentColumns, "~"),
+						text.Snip(summary, widthContentColumns, "~"),
+						text.Snip(tmetricUserOfWorklog, widthContentColumns, "~"),
+					)
+					timeSpendMinutes := entry.TimeSpentSeconds / 60
+					sumDurationProjectManagement += timeSpendMinutes
+					humanReadableDuration := fmt.Sprintf("%02d:%02d", int(math.Floor(float64(timeSpendMinutes/60))), int(timeSpendMinutes)%60)
+					row.ProjectManagementDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
+					row.Warnings += "\n\n\n\n\n\n"
+				}
+			}
+
 			for _, entry := range openProjectTimeEntries {
 				entryDate, _ := time.Parse("2006-01-02", entry.SpentOn)
 				if entryDate.Equal(currentDay) {
@@ -172,7 +244,7 @@ var diffCmd = &cobra.Command{
 					wpId := fmt.Sprintf("- WP ID: #%v", path.Base(entry.Links.WorkPackage.Href))
 					wp := fmt.Sprintf("- WP: %v", entry.Links.WorkPackage.Title)
 					activity := fmt.Sprintf("- Activity: %v", entry.Links.Activity.Title)
-					row.OpenProjectEntry += fmt.Sprintf(
+					row.ProjectManagementEntry += fmt.Sprintf(
 						"%v\n%v\n%v\n%v\n%v\n\n",
 						text.Snip(comment, widthContentColumns, "~"),
 						text.Snip(project, widthContentColumns, "~"),
@@ -181,9 +253,9 @@ var diffCmd = &cobra.Command{
 						text.Snip(activity, widthContentColumns, "~"),
 					)
 					duration, _ := entry.GetDuration()
-					sumDurationOpenProject += int(duration.Minutes())
+					sumDurationProjectManagement += int(duration.Minutes())
 					humanReadableDuration, _ := entry.GetHumanReadableDuration()
-					row.OpenProjectDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
+					row.ProjectManagementDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
 					workPackage, _ := openproject.GetWorkpackage(
 						path.Base(entry.Links.WorkPackage.Href), config,
 					)
@@ -205,16 +277,14 @@ var diffCmd = &cobra.Command{
 					for i := countWarnings; i < 6; i++ {
 						row.Warnings += "\n"
 					}
-
 				}
-
 			}
-			if sumDurationTmetric > sumDurationOpenProject {
-				diff := sumDurationTmetric - sumDurationOpenProject
+			if sumDurationTmetric > sumDurationProjectManagement {
+				diff := sumDurationTmetric - sumDurationProjectManagement
 				row.DiffInTime = strconv.Itoa(diff)
 				totalTimeDiff += diff
 			} else {
-				diff := sumDurationOpenProject - sumDurationTmetric
+				diff := sumDurationProjectManagement - sumDurationTmetric
 				row.DiffInTime = strconv.Itoa(diff)
 				totalTimeDiff += diff
 			}
@@ -222,8 +292,8 @@ var diffCmd = &cobra.Command{
 				row.Date,
 				strings.Trim(row.TmetricEntry, "\n"),
 				strings.Trim(row.TmetricDuration, "\n"),
-				strings.Trim(row.OpenProjectEntry, "\n"),
-				strings.Trim(row.OpenProjectDuration, "\n"),
+				strings.Trim(row.ProjectManagementEntry, "\n"),
+				strings.Trim(row.ProjectManagementDuration, "\n"),
 				row.DiffInTime,
 				row.Warnings,
 			})
