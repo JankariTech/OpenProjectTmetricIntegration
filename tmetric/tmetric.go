@@ -220,6 +220,17 @@ func GetAllTimeEntries(config *config.Config, tmetricUser User, startDate string
 		return timeEntriesOfTheSelectedClient[i].StartTime < timeEntriesOfTheSelectedClient[j].StartTime
 	})
 
+	slices.SortFunc(timeEntriesOfTheSelectedClient, func(a, b TimeEntry) int {
+		aStarted, _ := a.getParsedTime(true, "")
+		bStarted, _ := b.getParsedTime(true, "")
+		if aStarted.Equal(bStarted) {
+			return 0
+		}
+		if aStarted.After(bStarted) {
+			return 1
+		}
+		return -1
+	})
 	return timeEntriesOfTheSelectedClient, nil
 }
 

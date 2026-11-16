@@ -199,7 +199,7 @@ var diffCmd = &cobra.Command{
 			}
 			sumDurationProjectManagement := 0
 			for _, entry := range jiraWorklogs {
-				entryDate, _ := time.Parse("2006-01-02T15:04:05.000-0700", entry.Started)
+				entryDate, _ := entry.GetParsedTime(true)
 				if entryDate.In(loc).Year() == currentDay.Year() && entryDate.In(loc).Month() == currentDay.Month() && entryDate.In(loc).Day() == currentDay.Day() {
 					comment := fmt.Sprintf("Comment: %v", entry.TextComment)
 					var issue jira.Issue
