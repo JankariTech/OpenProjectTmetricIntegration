@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/jira"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
@@ -44,8 +43,8 @@ func validateOpenProjectWorkPackage(input string) error {
 	return nil
 }
 
-func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
-	entriesWithoutLink := tmetric.GetEntriesWithoutLinkToProjectManagement(config, timeEntries, nil)
+func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry) error {
+	entriesWithoutLink := tmetric.GetEntriesWithoutLinkToProjectManagement(cfg, timeEntries, nil)
 	if len(entriesWithoutLink) > 0 {
 		fmt.Println("Some time-entries do not have any workpackage / issue assigned")
 	}
@@ -83,11 +82,11 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 				Duration:    0,
 
 				Description: "to-delete-only-created-to-create-an-external-task",
-				ProjectId:   config.TmetricDummyProjectId,
+				ProjectId:   cfg.TmetricDummyProjectId,
 			}
 
-			if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
-				workPackage, err := openproject.GetWorkpackage(workPackageId, config)
+			if slices.Contains(cfg.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+				workPackage, err := openproject.GetWorkpackage(workPackageId, cfg)
 				if err == nil {
 					foundInProjectManagement = true
 				} else {
@@ -116,7 +115,7 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 
 				if !implausibleProjectConfirmation(
 					workPackage,
-					workPackage.Embedded.Assignee.Name == tmetricUser.Name || workPackage.Embedded.Assignee.Name == config.OpenProjectTeam,
+					workPackage.Embedded.Assignee.Name == tmetricUser.Name || workPackage.Embedded.Assignee.Name == cfg.OpenProjectTeam,
 					fmt.Sprintf("This WP is not assigned to you but to '%s'!", workPackage.Embedded.Assignee.Name),
 					"Do you really want to use a WP that is not assigned to you?",
 				) {
@@ -126,10 +125,10 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 				dummyTimeEntry.IssueId = fmt.Sprintf("#%v", workPackage.Id)
 				dummyTimeEntry.IssueName = workPackage.Subject
 				dummyTimeEntry.IssueUrl = fmt.Sprintf("/work_packages/%v", workPackage.Id)
-				dummyTimeEntry.ServiceUrl = config.OpenProjectUrl
+				dummyTimeEntry.ServiceUrl = cfg.OpenProjectUrl
 				dummyTimeEntry.ServiceType = "OpenProject"
-			} else if slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
-				issue, err := jira.GetIssue(workPackageId, config)
+			} else if slices.Contains(cfg.JiraTmetricClientIds, entry.Project.Client.Id) {
+				issue, err := jira.GetIssue(workPackageId, cfg)
 
 				if err == nil {
 					foundInProjectManagement = true
@@ -141,7 +140,7 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 				dummyTimeEntry.IssueId = issue.Key
 				dummyTimeEntry.IssueName = issue.Fields.Summary
 				dummyTimeEntry.IssueUrl = fmt.Sprintf("/browse/%v", issue.Key)
-				dummyTimeEntry.ServiceUrl = config.JiraUrl
+				dummyTimeEntry.ServiceUrl = cfg.JiraUrl
 			} else {
 				fmt.Println("not a Jira or OpenProject entry, skipping")
 				continue
@@ -160,13 +159,13 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry, tmetricUser tmet
 				spinner.Start()
 				spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
 				spinner.FinalMSG = "❌\n"
-				latestTimeEntry, err := tmetric.CreateDummyTimeEntry(dummyTimeEntry, tmetricUser, config)
+				latestTimeEntry, err := tmetric.CreateDummyTimeEntry(dummyTimeEntry, tmetricUser, cfg)
 				if err != nil {
 					return err
 				}
-				_ = latestTimeEntry.Delete(*config, tmetricUser)
+				_ = latestTimeEntry.Delete(*cfg, tmetricUser)
 				entry.Task = latestTimeEntry.Task
-				err = entry.Update(*config, tmetricUser)
+				err = entry.Update(*cfg, tmetricUser)
 				if err != nil {
 					return err
 				}
@@ -195,11 +194,11 @@ func implausibleProjectConfirmation(
 	return err == nil && result == "y"
 }
 
-func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config) error {
+func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry) error {
 	entriesWithoutWorkType := tmetric.GetEntriesWithoutWorkType(timeEntries, nil)
 	for _, entry := range entriesWithoutWorkType {
 		// work-types are only relevant for OpenProject WP
-		if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+		if slices.Contains(cfg.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
 			fmt.Println("Some time-entries do not have any work type assigned")
 			break
 		}
@@ -210,8 +209,8 @@ func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser t
 	defer spinner.Stop()
 	for _, entry := range entriesWithoutWorkType {
 		// work-types are only relevant for OpenProject WP
-		if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
-			possibleWorkTypes, err := entry.GetPossibleWorkTypes(*config, tmetricUser)
+		if slices.Contains(cfg.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+			possibleWorkTypes, err := entry.GetPossibleWorkTypes(*cfg, tmetricUser)
 
 			if err != nil {
 				return err
@@ -255,7 +254,7 @@ func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry, tmetricUser t
 				spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
 				spinner.FinalMSG = "❌\n"
 
-				err = entry.Update(*config, tmetricUser)
+				err = entry.Update(*cfg, tmetricUser)
 				if err != nil {
 					return err
 				}
@@ -284,27 +283,24 @@ var tmetricCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		config := config.NewConfig()
-
-		tmetricUser := tmetric.NewUser()
-		timeEntries, err := tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
+		timeEntries, err := tmetric.GetAllTimeEntries(cfg, tmetricUser, startDate, endDate)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-		err = handleEntriesWithoutIssue(timeEntries, tmetricUser, config)
+		err = handleEntriesWithoutIssue(timeEntries)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
 
 		// after an update time entries receive a new id, so we need to fetch them again
-		timeEntries, err = tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
+		timeEntries, err = tmetric.GetAllTimeEntries(cfg, tmetricUser, startDate, endDate)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-		err = handleEntriesWithoutWorkType(timeEntries, tmetricUser, config)
+		err = handleEntriesWithoutWorkType(timeEntries)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
@@ -314,16 +310,6 @@ var tmetricCmd = &cobra.Command{
 
 func init() {
 	checkCmd.AddCommand(tmetricCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// tmetricCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// tmetricCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	firstDayOfMonth := time.Now().Format("2006-01-02")
 	firstDayOfMonth = time.Now().AddDate(0, 0, -time.Now().Day()+1).Format("2006-01-02")
 

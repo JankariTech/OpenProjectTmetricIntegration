@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/spf13/cobra"
 )
@@ -40,16 +39,20 @@ var copyCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("end date is not in the format YYYY-MM-DD")
 		}
+		err = rootCmd.PersistentPreRunE(cmd, args)
+		if err != nil {
+			return err
+		}
 		return nil
 	},
 }
 
-func checkTmetricEntries(tmetricUser tmetric.User, checkWorktype bool, checkLink bool, clientIdsToCheck []int, config *config.Config) ([]tmetric.TimeEntry, error) {
+func checkTmetricEntries(checkWorktype bool, checkLink bool, clientIdsToCheck []int) ([]tmetric.TimeEntry, error) {
 	spinner := newSpinner()
 	defer spinner.Stop()
 	spinner.Prefix = "Checking time entries in Tmetric... "
 	spinner.FinalMSG = "❌\n"
-	timeEntries, err := tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
+	timeEntries, err := tmetric.GetAllTimeEntries(cfg, tmetricUser, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -60,14 +63,14 @@ func checkTmetricEntries(tmetricUser tmetric.User, checkWorktype bool, checkLink
 		)
 	}
 
-	if checkLink && len(tmetric.GetEntriesWithoutLinkToProjectManagement(config, timeEntries, clientIdsToCheck)) > 0 {
+	if checkLink && len(tmetric.GetEntriesWithoutLinkToProjectManagement(cfg, timeEntries, clientIdsToCheck)) > 0 {
 		return nil, fmt.Errorf(
 			"some time-entries are not linked to a work-package or issue, run the 'check tmetric' command to fix it",
 		)
 	}
 
 	filteredEntries := tmetric.GetEntriesNotTransferredToProjectManagement(
-		timeEntries, config.TmetricTagTransferredToOpenProject, clientIdsToCheck,
+		timeEntries, cfg.TmetricTagTransferredToOpenProject, clientIdsToCheck,
 	)
 
 	spinner.FinalMSG = "✔️\n"

@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/jira"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
@@ -48,7 +47,6 @@ type tableRow struct {
 }
 
 var widthOfFixedColumns = 61 // rough combined size of all columns that have a fixed width
-var userNameFromCmd string
 
 // tries to find out the width of the terminal and returns 80 if it fails
 func getTerminalWidth() int {
@@ -83,39 +81,25 @@ var diffCmd = &cobra.Command{
 		spinner := newSpinner()
 		defer spinner.Stop()
 		spinner.Start()
-		config := config.NewConfig()
 
-		tmetricUserMe := tmetric.NewUser()
-		var tmetricUser tmetric.User
-		if userNameFromCmd == "" {
-			tmetricUser = tmetricUserMe
-		} else {
-			var err error
-			tmetricUser, err = tmetric.FindUserByName(config, tmetricUserMe, userNameFromCmd)
-			if err != nil {
-				_, _ = fmt.Fprint(os.Stderr, err)
-				os.Exit(1)
-			}
-		}
-
-		tmetricTimeEntries, err := tmetric.GetAllTimeEntries(config, tmetricUser, startDate, endDate)
+		tmetricTimeEntries, err := tmetric.GetAllTimeEntries(cfg, tmetricUser, startDate, endDate)
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
 
 		var openProjectTimeEntries []openproject.TimeEntry
-		if config.OpenProjectUrl != "" {
+		if cfg.OpenProjectUrl != "" {
 			var openProjectUser openproject.User
 			if userNameFromCmd != "" {
 				var err error
-				openProjectUser, err = openproject.FindUserByName(config, userNameFromCmd)
+				openProjectUser, err = openproject.FindUserByName(cfg, userNameFromCmd)
 				if err != nil {
 					_, _ = fmt.Fprint(os.Stderr, err)
 					os.Exit(1)
 				}
 			}
-			openProjectTimeEntries, err = openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate, nil)
+			openProjectTimeEntries, err = openproject.GetAllTimeEntries(cfg, openProjectUser, startDate, endDate, nil)
 			if err != nil {
 				_, _ = fmt.Fprint(os.Stderr, err)
 				os.Exit(1)
@@ -123,8 +107,8 @@ var diffCmd = &cobra.Command{
 		}
 
 		var jiraWorklogs []jira.Worklog
-		if config.JiraUrl != "" {
-			jiraWorklogs, err = jira.GetAllWorklogs(config, tmetricUser.Name, startDate, endDate, tmetricUser.TimeZone.Id)
+		if cfg.JiraUrl != "" {
+			jiraWorklogs, err = jira.GetAllWorklogs(cfg, tmetricUser.Name, startDate, endDate, tmetricUser.TimeZone.Id)
 			if err != nil {
 				_, _ = fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
@@ -169,12 +153,12 @@ var diffCmd = &cobra.Command{
 					var workPackageNaming string
 					var externalTaskIdNaming string
 					var extraInformation string
-					if slices.Contains(config.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+					if slices.Contains(cfg.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
 						workPackageNaming = "WP"
 						externalTaskIdNaming = "WP ID"
 						workType, _ := entry.GetWorkType()
 						extraInformation = fmt.Sprintf("- Work Type: %v", workType)
-					} else if slices.Contains(config.JiraTmetricClientIds, entry.Project.Client.Id) {
+					} else if slices.Contains(cfg.JiraTmetricClientIds, entry.Project.Client.Id) {
 						workPackageNaming = "Summary"
 						externalTaskIdNaming = "Issue Key"
 						extraInformation = fmt.Sprintf("- tmetric User: %v", tmetricUser.Name)
@@ -206,7 +190,7 @@ var diffCmd = &cobra.Command{
 					if cacheEntry, ok := jiraIssueCache[entry.IssueId]; ok {
 						issue = cacheEntry
 					} else {
-						issue, err = jira.GetIssue(entry.IssueId, config)
+						issue, err = jira.GetIssue(entry.IssueId, cfg)
 						if err != nil {
 							row.Warnings += "could not retrieve issue from JIRA"
 						}
@@ -257,7 +241,7 @@ var diffCmd = &cobra.Command{
 					humanReadableDuration, _ := entry.GetHumanReadableDuration()
 					row.ProjectManagementDuration += fmt.Sprintf("%v\n\n\n\n\n\n", humanReadableDuration)
 					workPackage, _ := openproject.GetWorkpackage(
-						path.Base(entry.Links.WorkPackage.Href), config,
+						path.Base(entry.Links.WorkPackage.Href), cfg,
 					)
 					countWarnings := 0
 					if !workPackage.Embedded.Project.Active {
@@ -268,7 +252,7 @@ var diffCmd = &cobra.Command{
 						row.Warnings += "- not favorite\n  project\n"
 						countWarnings = countWarnings + 2
 					}
-					if workPackage.Embedded.Assignee.Name != tmetricUser.Name && workPackage.Embedded.Assignee.Name != config.OpenProjectTeam {
+					if workPackage.Embedded.Assignee.Name != tmetricUser.Name && workPackage.Embedded.Assignee.Name != cfg.OpenProjectTeam {
 						row.Warnings += "- not my\n  assignment\n"
 						countWarnings = countWarnings + 2
 					}
