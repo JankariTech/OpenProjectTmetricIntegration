@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/spf13/cobra"
 )
@@ -15,17 +14,14 @@ var jiraCmd = &cobra.Command{
 	Short: "Copy time entries from Tmetric to Jira",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		config := config.NewConfig()
-		tmetricUser := tmetric.NewUser()
-
 		filteredEntries, err := checkTmetricEntries(
-			tmetricUser, false, true, config.JiraTmetricClientIds, config)
+			false, true, cfg.JiraTmetricClientIds)
 		if err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 		for _, tmetricTimeEntry := range filteredEntries {
-			err = transferEntryToJira(tmetricTimeEntry, tmetricUser, config)
+			err = transferEntryToJira(tmetricTimeEntry)
 			if err != nil {
 				_, _ = fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
@@ -34,9 +30,7 @@ var jiraCmd = &cobra.Command{
 	},
 }
 
-func transferEntryToJira(
-	tmetricTimeEntry tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config,
-) error {
+func transferEntryToJira(tmetricTimeEntry tmetric.TimeEntry) error {
 	spinner := newSpinner()
 	defer spinner.Stop()
 	spinner.FinalMSG = "❌\n"
@@ -53,7 +47,7 @@ func transferEntryToJira(
 			tmetricTimeEntry.Note, tmetricTimeEntry.Project, tmetricTimeEntry.StartTime, err,
 		)
 	}
-	err = jiraWorklog.Save(*config)
+	err = jiraWorklog.Save(*cfg)
 	if err != nil {
 		return fmt.Errorf(
 			"could not work log '%v' for issue '%v' started at '%v' in Jira\n"+
@@ -65,9 +59,8 @@ func transferEntryToJira(
 		)
 	}
 
-	tmetricTimeEntry.TagAsTransferredToOpenProject(*config)
-	tmetricUser = tmetric.NewUser()
-	err = tmetricTimeEntry.Update(*config, tmetricUser)
+	tmetricTimeEntry.TagAsTransferredToOpenProject(*cfg)
+	err = tmetricTimeEntry.Update(*cfg, tmetricUser)
 	if err != nil {
 		return fmt.Errorf(
 			"could not tag tmetric entry as being transferred to project management\n"+

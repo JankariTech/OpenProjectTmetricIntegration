@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/spf13/cobra"
@@ -17,17 +16,14 @@ var openprojectCmd = &cobra.Command{
 	Short: "Copy time entries from Tmetric to OpenProject",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		config := config.NewConfig()
-		tmetricUser := tmetric.NewUser()
-
 		filteredEntries, err := checkTmetricEntries(
-			tmetricUser, true, true, config.OpenProjectTmetricClientIds, config)
+			true, true, cfg.OpenProjectTmetricClientIds)
 		if err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 		for _, tmetricTimeEntry := range filteredEntries {
-			err = transferEntryToOpenProject(tmetricTimeEntry, tmetricUser, config)
+			err = transferEntryToOpenProject(tmetricTimeEntry)
 			if err != nil {
 				_, _ = fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
@@ -36,9 +32,7 @@ var openprojectCmd = &cobra.Command{
 	},
 }
 
-func transferEntryToOpenProject(
-	tmetricTimeEntry tmetric.TimeEntry, tmetricUser tmetric.User, config *config.Config,
-) error {
+func transferEntryToOpenProject(tmetricTimeEntry tmetric.TimeEntry) error {
 	spinner := newSpinner()
 	defer spinner.Stop()
 	spinner.FinalMSG = "❌\n"
@@ -61,7 +55,7 @@ func transferEntryToOpenProject(
 		)
 	}
 
-	activity, err := openproject.NewActivityFromWorkType(*config, issueId, workType)
+	activity, err := openproject.NewActivityFromWorkType(*cfg, issueId, workType)
 	if err != nil {
 		return fmt.Errorf(
 			"Error with time entry '%v' in project '%v'\nError: %v\n",
@@ -80,7 +74,7 @@ func transferEntryToOpenProject(
 		)
 	}
 
-	err = openProjectTimeEntry.Save(*config)
+	err = openProjectTimeEntry.Save(*cfg)
 	if err != nil {
 		return fmt.Errorf(
 			"could not save time entry '%v' for work package '%v' spend on '%v' in OpenProject\n"+
@@ -92,9 +86,9 @@ func transferEntryToOpenProject(
 		)
 	}
 
-	tmetricTimeEntry.TagAsTransferredToOpenProject(*config)
+	tmetricTimeEntry.TagAsTransferredToOpenProject(*cfg)
 	tmetricUser = tmetric.NewUser()
-	err = tmetricTimeEntry.Update(*config, tmetricUser)
+	err = tmetricTimeEntry.Update(*cfg, tmetricUser)
 	if err != nil {
 		return fmt.Errorf(
 			"could not tag tmetric entry as being transferred to openproject\n"+

@@ -22,6 +22,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/briandowns/spinner"
 
 	"github.com/spf13/cobra"
@@ -32,15 +34,29 @@ var cfgFile string
 var startDate string
 var endDate string
 var exportDate string
+var userNameFromCmd string
+var cfg *config.Config
+var tmetricUser tmetric.User
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "OpenProjectTmetricIntegration",
 	Short: "Sync time entries from Tmetric to OpenProject",
 	Long:  `With this tool you can check your time entries in Tmetric and sync them to OpenProject.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		cfg = config.NewConfig()
+		tmetricUserMe := tmetric.NewUser()
+		var err error
+		if userNameFromCmd == "" {
+			tmetricUser = tmetricUserMe
+		} else {
+			tmetricUser, err = tmetric.FindUserByName(cfg, tmetricUserMe, userNameFromCmd)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

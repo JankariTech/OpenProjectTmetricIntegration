@@ -25,7 +25,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/openproject"
 	"github.com/JankariTech/OpenProjectTmetricIntegration/tmetric"
 	"github.com/Masterminds/sprig/v3"
@@ -52,9 +51,6 @@ var exportCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		config := config.NewConfig()
-		tmetricUser := tmetric.NewUser()
-
 		funcMap := template.FuncMap{
 			"ArbitraryString": func(i int) string {
 				if len(arbitraryString) >= i+1 {
@@ -68,7 +64,7 @@ var exportCmd = &cobra.Command{
 			},
 			"DetailedReport": func(clientName string, tagName string, groupName string) tmetric.Report {
 				report, err := tmetric.GetDetailedReport(
-					config, tmetricUser, clientName, tagName, groupName, startDate, endDate, projects,
+					cfg, tmetricUser, clientName, tagName, groupName, startDate, endDate, projects,
 				)
 				if err != nil {
 					_, _ = fmt.Fprint(os.Stderr, err)
@@ -80,12 +76,12 @@ var exportCmd = &cobra.Command{
 				return projects
 			},
 			"AllProjectsOfClient": func(clientName string) []string {
-				client, err := tmetric.GetClientByName(config, tmetricUser, clientName)
+				client, err := tmetric.GetClientByName(cfg, tmetricUser, clientName)
 				if err != nil {
 					_, _ = fmt.Fprint(os.Stderr, err)
 					os.Exit(1)
 				}
-				projects, err := tmetric.GetAllProjects(config, tmetricUser, client)
+				projects, err := tmetric.GetAllProjects(cfg, tmetricUser, client)
 				if err != nil {
 					_, _ = fmt.Fprint(os.Stderr, err)
 					os.Exit(1)
@@ -97,11 +93,11 @@ var exportCmd = &cobra.Command{
 				return projectNames
 			},
 			"AllWorkTypes": func() []tmetric.Tag {
-				workTypes, _ := tmetric.GetAllWorkTypes(config, tmetricUser)
+				workTypes, _ := tmetric.GetAllWorkTypes(cfg, tmetricUser)
 				return workTypes
 			},
 			"AllTeams": func() []tmetric.Team {
-				teams, _ := tmetric.GetAllTeams(config, tmetricUser)
+				teams, _ := tmetric.GetAllTeams(cfg, tmetricUser)
 				return teams
 			},
 			"formatFloat": func(f float64, optionalParameters ...string) string {
@@ -118,12 +114,12 @@ var exportCmd = &cobra.Command{
 			},
 			"AllTimeEntriesFromOpenProject": func(user string, workpackages []any) []openproject.TimeEntry {
 				var openProjectUser openproject.User
-				openProjectUser, err := openproject.FindUserByName(config, user)
+				openProjectUser, err := openproject.FindUserByName(cfg, user)
 				if err != nil {
 					_, _ = fmt.Fprint(os.Stderr, err)
 					os.Exit(1)
 				}
-				openProjectTimeEntries, err := openproject.GetAllTimeEntries(config, openProjectUser, startDate, endDate, workpackages)
+				openProjectTimeEntries, err := openproject.GetAllTimeEntries(cfg, openProjectUser, startDate, endDate, workpackages)
 				if err != nil {
 					_, _ = fmt.Fprint(os.Stderr, err)
 					os.Exit(1)
