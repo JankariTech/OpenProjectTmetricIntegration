@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
 	"github.com/go-resty/resty/v2"
@@ -133,4 +134,19 @@ func (worklog *Worklog) Save(config config.Config) error {
 		)
 	}
 	return nil
+}
+
+func (worklog *Worklog) GetParsedTime(startTime bool) (time.Time, error) {
+	stringToParse := ""
+	if startTime {
+		stringToParse = worklog.Started
+	} else {
+		stringToParse = worklog.Started
+	}
+
+	timeParsed, err := time.Parse("2006-01-02T15:04:05.000-0700", stringToParse)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse time: %v", err)
+	}
+	return timeParsed, nil
 }

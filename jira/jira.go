@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"time"
 
@@ -94,7 +95,8 @@ func GetAllWorklogs(config *config.Config, user string, startDate string, endDat
 
 	var filteredWorklogs []Worklog
 	for _, worklog := range worklogs {
-		worklogStarted, _ := time.Parse("2006-01-02T15:04:05.000-0700", worklog.Started)
+
+		worklogStarted, _ := worklog.GetParsedTime(true)
 
 		if (
 		// the tmetric user saved in Jira should contain the display name of the user in tmetric
@@ -108,6 +110,17 @@ func GetAllWorklogs(config *config.Config, user string, startDate string, endDat
 			filteredWorklogs = append(filteredWorklogs, worklog)
 		}
 	}
+	slices.SortFunc(filteredWorklogs, func(a, b Worklog) int {
+		aStarted, _ := a.GetParsedTime(true)
+		bStarted, _ := b.GetParsedTime(true)
+		if aStarted.Equal(bStarted) {
+			return 0
+		}
+		if aStarted.After(bStarted) {
+			return 1
+		}
+		return -1
+	})
 
 	return filteredWorklogs, nil
 }
