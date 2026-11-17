@@ -81,4 +81,7 @@ func init() {
 	jiraCmd.Flags().StringVarP(&startDate, "start", "s", firstDayOfMonth, "start date")
 	today := time.Now().Format("2006-01-02")
 	jiraCmd.Flags().StringVarP(&endDate, "end", "e", today, "end date")
+	jiraCmd.Flags().StringVarP(
+		&userNameFromCmd, "user", "u", "", "name of the user whose entries should be transferred",
+	)
 }

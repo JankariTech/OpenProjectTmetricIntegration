@@ -159,13 +159,13 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry) error {
 				spinner.Start()
 				spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
 				spinner.FinalMSG = "❌\n"
-				latestTimeEntry, err := tmetric.CreateDummyTimeEntry(dummyTimeEntry, tmetricUser, cfg)
+				latestTimeEntry, err := tmetric.CreateDummyTimeEntry(dummyTimeEntry, tmetricActor, cfg)
 				if err != nil {
 					return err
 				}
-				_ = latestTimeEntry.Delete(*cfg, tmetricUser)
+				_ = latestTimeEntry.Delete(*cfg, tmetricActor)
 				entry.Task = latestTimeEntry.Task
-				err = entry.Update(*cfg, tmetricUser)
+				err = entry.Update(*cfg, tmetricActor)
 				if err != nil {
 					return err
 				}
@@ -316,4 +316,7 @@ func init() {
 	tmetricCmd.Flags().StringVarP(&startDate, "start", "s", firstDayOfMonth, "start date")
 	today := time.Now().Format("2006-01-02")
 	tmetricCmd.Flags().StringVarP(&endDate, "end", "e", today, "end date")
+	tmetricCmd.Flags().StringVarP(
+		&userNameFromCmd, "user", "u", "", "name of the user whose entries should be checked",
+	)
 }
