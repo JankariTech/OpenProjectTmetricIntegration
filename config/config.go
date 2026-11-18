@@ -39,6 +39,7 @@ type Config struct {
 	JiraToken                          string
 	JiraTmetricClientIds               []int
 	JiraUser                           string
+	JiraAppendTmetricUserToComment     bool
 }
 
 func NewConfig() *Config {
@@ -79,6 +80,7 @@ func NewConfig() *Config {
 		if len(config.JiraTmetricClientIds) == 0 {
 			errorMessage = "jira.tmetricClientIds not set"
 		}
+		config.JiraAppendTmetricUserToComment = jira.GetBool("appendTmetricUserToComment")
 	}
 
 	if jira == nil && openproject == nil {

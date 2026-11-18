@@ -273,7 +273,7 @@ func (timeEntry *TimeEntry) ConvertToOpenProjectTimeEntry(activity openproject.A
 	return opTimeEntry, err
 }
 
-func (timeEntry *TimeEntry) ConvertToJiraWorklog(tmetricUser User) (jira.Worklog, error) {
+func (timeEntry *TimeEntry) ConvertToJiraWorklog(config config.Config, tmetricUser User) (jira.Worklog, error) {
 	duration, err := timeEntry.GetDuration()
 	if err != nil {
 		return jira.Worklog{}, err
@@ -283,8 +283,12 @@ func (timeEntry *TimeEntry) ConvertToJiraWorklog(tmetricUser User) (jira.Worklog
 		return jira.Worklog{}, err
 	}
 	var commentContent []jira.CommentNode
-	if timeEntry.Note != "" {
-		commentContent = append(commentContent, jira.CommentNode{Type: "text", Text: timeEntry.Note})
+	commentText := timeEntry.Note
+	if config.JiraAppendTmetricUserToComment {
+		commentText += " - " + tmetricUser.Name
+	}
+	if commentText != "" {
+		commentContent = append(commentContent, jira.CommentNode{Type: "text", Text: commentText})
 	}
 	return jira.Worklog{
 		Key: timeEntry.Task.ExternalLink.IssueId,
