@@ -33,6 +33,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var batchMode bool
+
+type ProjectManagement int
+
+type tmetricEntryBatch struct {
+	entries     []tmetric.TimeEntry
+	projectName string
+	clientId    int
+}
+
+const (
+	OpenProject ProjectManagement = iota
+	Jira
+)
+
 func validateOpenProjectWorkPackage(input string) error {
 	if len(input) > 0 {
 		matched, err := regexp.MatchString(`^[a-zA-Z0-9-]+$`, input)
@@ -49,29 +64,67 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry) error {
 		fmt.Println("Some time-entries do not have any workpackage / issue assigned")
 	}
 
-	spinner := newSpinner()
-	defer spinner.Stop()
+	var batches []*tmetricEntryBatch
 
-	for _, entry := range entriesWithoutLink {
-		getWPPrompt := promptui.Prompt{
-			Label: fmt.Sprintf(
-				"%v => %v %v-%v. Provide a WP number / issue ID to be assigned to this time-entry (Enter to skip)",
-				entry.Project.Name, entry.Note, entry.StartTime, entry.EndTime,
-			),
-			Validate: validateOpenProjectWorkPackage,
+	var singularPluralOutput string
+	batchIndex := make(map[int]int) // project ID → index (batch mode only)
+	if batchMode {
+		// create batches by project
+		for _, entry := range entriesWithoutLink {
+			idx, ok := batchIndex[entry.Project.Id]
+			if !ok {
+				idx = len(batches)
+				batchIndex[entry.Project.Id] = idx
+				batches = append(batches, &tmetricEntryBatch{
+					clientId:    entry.Project.Client.Id,
+					projectName: entry.Project.Name,
+				})
+			}
+			batches[idx].entries = append(batches[idx].entries, entry)
+		}
+		singularPluralOutput = "these entries"
+	} else {
+		// every batch has just a single entry
+		for _, entry := range entriesWithoutLink {
+			batches = append(batches, &tmetricEntryBatch{
+				entries:     []tmetric.TimeEntry{entry},
+				clientId:    entry.Project.Client.Id,
+				projectName: entry.Project.Name,
+			})
+		}
+		singularPluralOutput = "this entry"
+	}
+
+	for _, batch := range batches {
+		fmt.Printf("Project: '%v'\n", batch.projectName)
+		for _, entry := range batch.entries {
+			fmt.Printf("  - %v %v-%v\n", entry.Note, entry.StartTime, entry.EndTime)
 		}
 
 		foundInProjectManagement := false
 		for !foundInProjectManagement {
-
+			getWPPrompt := promptui.Prompt{
+				Label:    fmt.Sprintf("WP number/issue ID to be assigned to %s (↵ to skip)", singularPluralOutput),
+				Validate: validateOpenProjectWorkPackage,
+			}
 			workPackageId, err := getWPPrompt.Run()
-
 			if err != nil {
 				return fmt.Errorf("prompt failed: %v", err)
 			}
 
 			if workPackageId == "" {
 				fmt.Println("skipping")
+				foundInProjectManagement = true
+				continue
+			}
+
+			var pmType ProjectManagement
+			if slices.Contains(cfg.JiraTmetricClientIds, batch.clientId) {
+				pmType = Jira
+			} else if slices.Contains(cfg.OpenProjectTmetricClientIds, batch.clientId) {
+				pmType = OpenProject
+			} else {
+				fmt.Println("invalid Project Client ID, skipping")
 				foundInProjectManagement = true
 				continue
 			}
@@ -85,14 +138,15 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry) error {
 				ProjectId:   cfg.TmetricDummyProjectId,
 			}
 
-			if slices.Contains(cfg.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+			if pmType == OpenProject {
 				workPackage, err := openproject.GetWorkpackage(workPackageId, cfg)
-				if err == nil {
-					foundInProjectManagement = true
-				} else {
+				if err != nil {
 					fmt.Printf("%v\n", err)
+					foundInProjectManagement = false
 					continue
 				}
+
+				// only OpenProject has a plausibility checks for now
 				if !implausibleProjectConfirmation(
 					workPackage,
 					workPackage.Embedded.Project.Active,
@@ -122,18 +176,18 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry) error {
 					foundInProjectManagement = false
 					continue
 				}
+
 				dummyTimeEntry.IssueId = fmt.Sprintf("#%v", workPackage.Id)
 				dummyTimeEntry.IssueName = workPackage.Subject
 				dummyTimeEntry.IssueUrl = fmt.Sprintf("/work_packages/%v", workPackage.Id)
 				dummyTimeEntry.ServiceUrl = cfg.OpenProjectUrl
 				dummyTimeEntry.ServiceType = "OpenProject"
-			} else if slices.Contains(cfg.JiraTmetricClientIds, entry.Project.Client.Id) {
+			} else {
 				issue, err := jira.GetIssue(workPackageId, cfg)
 
-				if err == nil {
-					foundInProjectManagement = true
-				} else {
+				if err != nil {
 					fmt.Printf("%v\n", err)
+					foundInProjectManagement = false
 					continue
 				}
 
@@ -141,38 +195,58 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry) error {
 				dummyTimeEntry.IssueName = issue.Fields.Summary
 				dummyTimeEntry.IssueUrl = fmt.Sprintf("/browse/%v", issue.Key)
 				dummyTimeEntry.ServiceUrl = cfg.JiraUrl
-			} else {
-				fmt.Println("not a Jira or OpenProject entry, skipping")
-				continue
 			}
 
-			prompt := promptui.Prompt{
-				Label: fmt.Sprintf(
-					"WP/Issue: %v. Subject: %v. Update t-metric entry?",
-					dummyTimeEntry.IssueId, dummyTimeEntry.IssueName,
-				),
-				IsConfirm: true,
+			err = updateLinkForBatch(dummyTimeEntry, batch)
+			if err != nil {
+				fmt.Printf("%v\n", err)
 			}
-			updateTmetricConfirmation, err := prompt.Run()
-
-			if strings.ToLower(updateTmetricConfirmation) == "y" {
-				spinner.Start()
-				spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
-				spinner.FinalMSG = "❌\n"
-				latestTimeEntry, err := tmetric.CreateDummyTimeEntry(dummyTimeEntry, tmetricActor, cfg)
-				if err != nil {
-					return err
-				}
-				_ = latestTimeEntry.Delete(*cfg, tmetricActor)
-				entry.Task = latestTimeEntry.Task
-				err = entry.Update(*cfg, tmetricActor)
-				if err != nil {
-					return err
-				}
-				spinner.FinalMSG = "✔️\n"
-				spinner.Stop()
-			}
+			foundInProjectManagement = true
 		}
+
+	}
+	return nil
+}
+
+func updateLinkForBatch(dummyTimeEntry tmetric.DummyTimeEntry, batch *tmetricEntryBatch) error {
+	spinner := newSpinner()
+	defer spinner.Stop()
+
+	prompt := promptui.Prompt{
+		Label: fmt.Sprintf(
+			"WP/Issue: %v. Subject: %v. Update t-metric entries",
+			dummyTimeEntry.IssueId, dummyTimeEntry.IssueName,
+		),
+		IsConfirm: true,
+	}
+	updateTmetricConfirmation, err := prompt.Run()
+	if err != nil {
+		return err
+	}
+
+	if strings.ToLower(updateTmetricConfirmation) == "y" {
+		spinner.Start()
+		latestTimeEntry, err := tmetric.CreateDummyTimeEntry(dummyTimeEntry, tmetricActor, cfg)
+		if err != nil {
+			return err
+		}
+
+		_ = latestTimeEntry.Delete(*cfg, tmetricActor)
+
+		for _, entry := range batch.entries {
+			spinner.Stop()
+			spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v'", entry.Note)
+			spinner.Start()
+			entry.Task = latestTimeEntry.Task
+			err = entry.Update(*cfg, tmetricActor)
+			if err != nil {
+				spinner.FinalMSG = "❌\n"
+				return err
+			}
+
+		}
+		spinner.FinalMSG = "✔️\n"
+		spinner.Stop()
 	}
 	return nil
 }
@@ -205,8 +279,8 @@ func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry) error {
 
 	}
 
-	spinner := newSpinner()
-	defer spinner.Stop()
+	sp := newSpinner()
+	defer sp.Stop()
 	for _, entry := range entriesWithoutWorkType {
 		// work-types are only relevant for OpenProject WP
 		if slices.Contains(cfg.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
@@ -250,16 +324,16 @@ func handleEntriesWithoutWorkType(timeEntries []tmetric.TimeEntry) error {
 			updateTmetricConfirmation, err := promptConfirm.Run()
 			if strings.ToLower(updateTmetricConfirmation) == "y" {
 				entry.Tags = append(entry.Tags, tmetric.Tag{Name: workType, IsWorkType: true})
-				spinner.Start()
-				spinner.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
-				spinner.FinalMSG = "❌\n"
+				sp.Start()
+				sp.Prefix = fmt.Sprintf("Updating t-metric entry '%v' ", entry.Note)
+				sp.FinalMSG = "❌\n"
 
 				err = entry.Update(*cfg, tmetricUser)
 				if err != nil {
 					return err
 				}
-				spinner.FinalMSG = "✔️\n"
-				spinner.Stop()
+				sp.FinalMSG = "✔️\n"
+				sp.Stop()
 			}
 		}
 
@@ -319,4 +393,5 @@ func init() {
 	tmetricCmd.Flags().StringVarP(
 		&userNameFromCmd, "user", "u", "", "name of the user whose entries should be checked",
 	)
+	tmetricCmd.Flags().BoolVarP(&batchMode, "batch", "b", false, "group time entries by project and assign WP/issue by batch")
 }
