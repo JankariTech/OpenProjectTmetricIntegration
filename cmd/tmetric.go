@@ -34,7 +34,9 @@ import (
 )
 
 var batchMode bool
+
 type ProjectManagement int
+
 const (
 	OpenProject ProjectManagement = iota
 	Jira
@@ -68,18 +70,52 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry) error {
 			}
 		}
 		getWPPrompt := promptui.Prompt{
-			Label: "Provide a issue ID to be assigned to these time-entries (Enter to skip)",
-			),
+			Label:    "Provide an issue ID to be assigned to these time-entries (Enter to skip)",
 			Validate: validateOpenProjectWorkPackage,
 		}
 		workPackageId, err := getWPPrompt.Run()
 		if err != nil {
 			return fmt.Errorf("prompt failed: %v", err)
 		}
-		entry, err := makeDummyTimeEntry(Jira, workPackageId)
+		dummyTimeEntry, err := makeDummyTimeEntry(Jira, workPackageId)
 		if err != nil {
 			return err
 		}
+		prompt := promptui.Prompt{
+			Label: fmt.Sprintf(
+				"WP/Issue: %v. Subject: %v. Update t-metric entries?",
+				dummyTimeEntry.IssueId, dummyTimeEntry.IssueName,
+			),
+			IsConfirm: true,
+		}
+		updateTmetricConfirmation, err := prompt.Run()
+
+		if strings.ToLower(updateTmetricConfirmation) == "y" {
+			latestTimeEntry, err := tmetric.CreateDummyTimeEntry(dummyTimeEntry, tmetricActor, cfg)
+			if err != nil {
+				return err
+			}
+			_ = latestTimeEntry.Delete(*cfg, tmetricActor)
+			spinner.FinalMSG = "❌\n"
+			spinner.Prefix = "Updating t-metric entry "
+			for _, entry := range entriesWithoutLink {
+				// ToDo also do the same for openproject items
+				if slices.Contains(cfg.JiraTmetricClientIds, entry.Project.Client.Id) {
+					spinner.Stop()
+					spinner.Suffix = entry.Note
+					spinner.Start()
+					entry.Task = latestTimeEntry.Task
+					err = entry.Update(*cfg, tmetricActor)
+					if err != nil {
+						return err
+					}
+
+				}
+			}
+			spinner.FinalMSG = "✔️\n"
+			spinner.Stop()
+		}
+		return nil
 	}
 
 	for _, entry := range entriesWithoutLink {
@@ -106,7 +142,23 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry) error {
 				continue
 			}
 
-			makeDummyTimeEntry()
+			var pmType ProjectManagement
+			if slices.Contains(cfg.JiraTmetricClientIds, entry.Project.Client.Id) {
+				pmType = Jira
+			} else if slices.Contains(cfg.OpenProjectTmetricClientIds, entry.Project.Client.Id) {
+				pmType = OpenProject
+			} else {
+				return errors.New("invalid Project Client ID")
+			}
+
+			dummyTimeEntry, err := makeDummyTimeEntry(pmType, workPackageId)
+			if err != nil {
+				fmt.Printf("%v\n", err)
+			}
+			if dummyTimeEntry.IssueId == "" {
+				foundInProjectManagement = false
+				continue
+			}
 
 			prompt := promptui.Prompt{
 				Label: fmt.Sprintf(
@@ -139,7 +191,7 @@ func handleEntriesWithoutIssue(timeEntries []tmetric.TimeEntry) error {
 	return nil
 }
 
-func makeDummyTimeEntry(projectManagement ProjectManagement, workPackageId string) (tmetric.DummyTimeEntry, error){
+func makeDummyTimeEntry(projectManagement ProjectManagement, workPackageId string) (tmetric.DummyTimeEntry, error) {
 	dummyTimeEntry := tmetric.DummyTimeEntry{
 		IsStarted:   true,
 		ShowIssueId: true,
@@ -149,12 +201,9 @@ func makeDummyTimeEntry(projectManagement ProjectManagement, workPackageId strin
 		ProjectId:   cfg.TmetricDummyProjectId,
 	}
 
-	foundInProjectManagement := false
 	if projectManagement == OpenProject {
 		workPackage, err := openproject.GetWorkpackage(workPackageId, cfg)
-		if err == nil {
-			foundInProjectManagement = true
-		} else {
+		if err != nil {
 			return tmetric.DummyTimeEntry{}, err
 		}
 		if !implausibleProjectConfirmation(
@@ -163,8 +212,7 @@ func makeDummyTimeEntry(projectManagement ProjectManagement, workPackageId strin
 			"This project is NOT active! ",
 			"Do you want to use a WP from an INACTIVE project?",
 		) {
-			foundInProjectManagement = false
-			continue
+			return tmetric.DummyTimeEntry{}, nil
 		}
 
 		if !implausibleProjectConfirmation(
@@ -173,8 +221,7 @@ func makeDummyTimeEntry(projectManagement ProjectManagement, workPackageId strin
 			"This project is none of your favorite projects!",
 			"Do you really want to use a WP from a not-favorite project?",
 		) {
-			foundInProjectManagement = false
-			continue
+			return tmetric.DummyTimeEntry{}, nil
 		}
 
 		if !implausibleProjectConfirmation(
@@ -183,8 +230,7 @@ func makeDummyTimeEntry(projectManagement ProjectManagement, workPackageId strin
 			fmt.Sprintf("This WP is not assigned to you but to '%s'!", workPackage.Embedded.Assignee.Name),
 			"Do you really want to use a WP that is not assigned to you?",
 		) {
-			foundInProjectManagement = false
-			continue
+			return tmetric.DummyTimeEntry{}, nil
 		}
 		dummyTimeEntry.IssueId = fmt.Sprintf("#%v", workPackage.Id)
 		dummyTimeEntry.IssueName = workPackage.Subject
@@ -194,11 +240,8 @@ func makeDummyTimeEntry(projectManagement ProjectManagement, workPackageId strin
 	} else if projectManagement == Jira {
 		issue, err := jira.GetIssue(workPackageId, cfg)
 
-		if err == nil {
-			foundInProjectManagement = true
-		} else {
-			fmt.Printf("%v\n", err)
-			continue
+		if err != nil {
+			return tmetric.DummyTimeEntry{}, err
 		}
 
 		dummyTimeEntry.IssueId = issue.Key
@@ -206,9 +249,9 @@ func makeDummyTimeEntry(projectManagement ProjectManagement, workPackageId strin
 		dummyTimeEntry.IssueUrl = fmt.Sprintf("/browse/%v", issue.Key)
 		dummyTimeEntry.ServiceUrl = cfg.JiraUrl
 	} else {
-		fmt.Println("not a Jira or OpenProject entry, skipping")
-		continue
+		return tmetric.DummyTimeEntry{}, errors.New("unsupported project management")
 	}
+	return dummyTimeEntry, nil
 }
 
 func implausibleProjectConfirmation(
