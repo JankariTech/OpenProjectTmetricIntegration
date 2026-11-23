@@ -67,6 +67,7 @@ jira:
   user: '<email of your jira user>'
   token: <jira token>
   tmetricClientIds: <array of t-metric clients, who's time needs to be transferred to Jira>
+  appendTmetricUserToComment: true
 openproject:
   url: 'https://community.openproject.org'
   token: <openproject token>
@@ -76,8 +77,9 @@ tmetric:
   dummyProjectId: <id of the dummy project the admin created>
 ```
 
-The arrays have to have the format `[123, 456]`.
-The client Ids can be found in t-metric, edit a client and check the address. e.g. for the URL `https://app.tmetric.com/#/account/123/clients/4567?tab=general` `4567` is the ID you need.
+- The arrays have to have the format `[123, 456]`.
+- The client Ids can be found in t-metric, edit a client and check the address. e.g. for the URL `https://app.tmetric.com/#/account/123/clients/4567?tab=general` `4567` is the ID you need.
+- `appendTmetricUserToComment` is optional and if set to `true` the name of the user from tmetric will be added to the worklog description in Jira.
 
 ### run
 

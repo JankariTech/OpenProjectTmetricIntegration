@@ -1,8 +1,12 @@
 package tmetric
 
 import (
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"testing"
+
+	"github.com/JankariTech/OpenProjectTmetricIntegration/config"
+	"github.com/JankariTech/OpenProjectTmetricIntegration/jira"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_getIso8601Duration(t *testing.T) {
@@ -96,6 +100,144 @@ func Test_getIso8601Duration(t *testing.T) {
 			if spendOn != tt.wantSpendOn {
 				t.Errorf("got SpendOn = %v, want %v", spendOn, tt.wantSpendOn)
 			}
+		})
+	}
+}
+
+func TestTimeEntry_ConvertToJiraWorklog(t *testing.T) {
+	type fields struct {
+		Id        int
+		StartTime string
+		EndTime   string
+		Task      Task
+		Note      string
+		Tags      []Tag
+	}
+
+	tests := []struct {
+		name        string
+		timeEntry   TimeEntry
+		config      config.Config
+		tmetricUser User
+		want        jira.Worklog
+		wantErr     assert.ErrorAssertionFunc
+	}{
+		{
+			name: "all fields correct",
+			timeEntry: TimeEntry{
+				Id:        1,
+				StartTime: "2022-01-01T08:00:00",
+				EndTime:   "2022-01-02T10:31:00",
+				Task: Task{
+					ExternalLink: ExternalLink{IssueId: "SCRUM-123"},
+				},
+				Note: "my work",
+			},
+			tmetricUser: User{Name: "Alice", Id: 123},
+			config:      config.Config{JiraAppendTmetricUserToComment: true},
+			want: jira.Worklog{
+				Key: "SCRUM-123",
+				Comment: jira.Comment{
+					Type:    "doc",
+					Version: 1,
+					Content: []jira.CommentNode{
+						{
+							Type: "paragraph",
+							Text: "",
+							Content: []jira.CommentNode{
+								{
+									Type:    "text",
+									Text:    "my work - Alice",
+									Content: nil,
+								},
+							},
+						},
+					},
+				},
+				Started:          "2022-01-01T08:00:00.000+0000",
+				TimeSpentSeconds: 95460,
+				Tmetric:          jira.Tmetric{UserDisplayName: "Alice", UserId: 123},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "don't append username to comment",
+			timeEntry: TimeEntry{
+				Id:        1,
+				StartTime: "2022-01-01T08:00:00",
+				EndTime:   "2022-01-02T10:31:00",
+				Task: Task{
+					ExternalLink: ExternalLink{IssueId: "SCRUM-123"},
+				},
+				Note: "my work",
+			},
+			tmetricUser: User{Name: "Alice", Id: 123},
+			config:      config.Config{JiraAppendTmetricUserToComment: false},
+			want: jira.Worklog{
+				Key: "SCRUM-123",
+				Comment: jira.Comment{
+					Type:    "doc",
+					Version: 1,
+					Content: []jira.CommentNode{
+						{
+							Type: "paragraph",
+							Text: "",
+							Content: []jira.CommentNode{
+								{
+									Type:    "text",
+									Text:    "my work",
+									Content: nil,
+								},
+							},
+						},
+					},
+				},
+				Started:          "2022-01-01T08:00:00.000+0000",
+				TimeSpentSeconds: 95460,
+				Tmetric:          jira.Tmetric{UserDisplayName: "Alice", UserId: 123},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "empty tmetric note",
+			timeEntry: TimeEntry{
+				Id:        1,
+				StartTime: "2022-01-01T08:00:00",
+				EndTime:   "2022-01-02T10:31:00",
+				Task: Task{
+					ExternalLink: ExternalLink{IssueId: "SCRUM-123"},
+				},
+				Note: "",
+			},
+			tmetricUser: User{Name: "Alice", Id: 123},
+			config:      config.Config{JiraAppendTmetricUserToComment: false},
+			want: jira.Worklog{
+				Key: "SCRUM-123",
+				Comment: jira.Comment{
+					Type:    "doc",
+					Version: 1,
+					Content: []jira.CommentNode{
+						{
+							Type:    "paragraph",
+							Text:    "",
+							Content: nil,
+						},
+					},
+				},
+				Started:          "2022-01-01T08:00:00.000+0000",
+				TimeSpentSeconds: 95460,
+				Tmetric:          jira.Tmetric{UserDisplayName: "Alice", UserId: 123},
+			},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.timeEntry.ConvertToJiraWorklog(tt.config, tt.tmetricUser)
+			if !tt.wantErr(t, err, fmt.Sprintf("ConvertToJiraWorklog(%v, %v)", tt.config, tt.tmetricUser)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "ConvertToJiraWorklog(%v, %v)", tt.config, tt.tmetricUser)
 		})
 	}
 }

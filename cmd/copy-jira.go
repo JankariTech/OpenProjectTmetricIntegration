@@ -39,7 +39,7 @@ func transferEntryToJira(tmetricTimeEntry tmetric.TimeEntry) error {
 	)
 	spinner.Restart()
 
-	jiraWorklog, err := tmetricTimeEntry.ConvertToJiraWorklog(tmetricUser)
+	jiraWorklog, err := tmetricTimeEntry.ConvertToJiraWorklog(*cfg, tmetricUser)
 	if err != nil {
 		return fmt.Errorf(
 			"could not convert time entry '%v' in project '%v' started at '%v' from tmetric to Jira\n"+
