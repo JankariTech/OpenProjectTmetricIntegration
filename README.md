@@ -91,6 +91,8 @@ go run main.go check tmetric
 The tool with show you any invalid or inconsistent time entries and ask you for data to fix them.
 This step will only adjust data on tmetric, no data will be written to OpenProject or Jira.
 
+Using the `-b` switch groups all tmetric entries according to the tmetric projects and asks one WP/issue for that batch
+
 #### transfer the time entries to OpenProject / Jira
 ```bash
 go run main.go copy <projectmanagement>
